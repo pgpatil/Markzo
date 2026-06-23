@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Board Track — ICSE 10 study planner</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  :root{
+    --paper:#f5f1e8;
+    --paper-2:#fbf8f1;
+    --card:#ffffff;
+    --ink:#23252b;
+    --ink-soft:#5c6068;
+    --ink-faint:#9a9ea7;
+    --line:#e7e1d4;
+    --study:#3a7d5d;       /* grounded green */
+    --study-soft:#e4efe8;
+    --test:#d98324;        /* warm amber */
+    --test-soft:#f9ecd9;
+    --wall:#ece6d8;        /* fixed-commitment block */
+    --radius:18px;
+    --shadow:0 1px 2px rgba(35,37,43,.04),0 10px 30px rgba(35,37,43,.06);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    background:var(--paper);color:var(--ink);font-size:16px;line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{margin:0;font-weight:680;letter-spacing:-.015em;}
+  button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
+  input,select{font-family:inherit;}
+  .wrap{max-width:480px;margin:0 auto;padding:0 20px;}
+
+  /* ---- onboarding ---- */
+  #onb{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;z-index:10;}
+  .onb-top{padding:22px 20px 0;max-width:480px;margin:0 auto;width:100%;}
+  .steps{display:flex;gap:6px;}
+  .steps i{flex:1;height:4px;border-radius:2px;background:var(--line);transition:.3s;}
+  .steps i.on{background:var(--study);}
+  .onb-body{flex:1;overflow-y:auto;padding:30px 20px 20px;max-width:480px;margin:0 auto;width:100%;}
+  .eyebrow{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--test);}
+  .onb-body h1{font-size:28px;line-height:1.15;margin:10px 0 10px;}
+  .onb-body .lead{font-size:15.5px;color:var(--ink-soft);margin-bottom:26px;}
+  .onb-foot{padding:14px 20px calc(20px + env(safe-area-inset-bottom));max-width:480px;margin:0 auto;width:100%;}
+
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    background:var(--study);color:#fff;font-weight:650;font-size:15.5px;
+    padding:15px;border-radius:14px;transition:transform .12s;}
+  .btn:active{transform:scale(.985);}
+  .btn.ghost{background:var(--card);color:var(--ink);border:1px solid var(--line);}
+  .btn.link{background:none;color:var(--ink-soft);font-weight:600;padding:12px;}
+
+  .timefield{display:flex;gap:12px;}
+  .timefield .tf{flex:1;}
+  .tf label{display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:7px;}
+  .tf input{width:100%;padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--card);font-size:17px;color:var(--ink);text-align:center;}
+  .tf input:focus{outline:none;border-color:var(--study);}
+
+  .or{display:flex;align-items:center;gap:12px;margin:22px 0;color:var(--ink-faint);font-size:13px;}
+  .or::before,.or::after{content:"";flex:1;height:1px;background:var(--line);}
+
+  .upload-zone{border:1.5px dashed var(--line);border-radius:16px;padding:26px 18px;text-align:center;background:var(--paper-2);}
+  .upload-zone svg{width:30px;height:30px;stroke:var(--ink-faint);fill:none;stroke-width:1.7;margin-bottom:8px;}
+  .upload-zone p{margin:0;font-size:14px;color:var(--ink-soft);}
+  .upload-zone .hint{font-size:12.5px;color:var(--ink-faint);margin-top:4px;}
+
+  .prog{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:14px;}
+  .prog i{display:block;height:100%;width:6%;background:var(--study);transition:.25s;}
+
+  /* day chips */
+  .day-toggle{display:flex;gap:7px;flex-wrap:wrap;margin-top:4px;}
+  .day-toggle button{flex:1;min-width:54px;padding:11px 0;border-radius:11px;border:1px solid var(--line);
+    background:var(--card);font-size:13px;font-weight:650;color:var(--ink-soft);}
+  .day-toggle button.on{background:var(--study-soft);border-color:var(--study);color:var(--study);}
+
+  /* ---- review modal ---- */
+  .sheet-bg{position:fixed;inset:0;background:rgba(30,32,38,.5);z-index:40;display:none;align-items:flex-end;justify-content:center;}
+  .sheet-bg.show{display:flex;}
+  .sheet{background:var(--card);width:100%;max-width:480px;border-radius:24px 24px 0 0;padding:24px 20px calc(22px + env(safe-area-inset-bottom));}
+  .sheet h2{font-size:20px;margin-bottom:4px;}
+  .sheet .sub{font-size:13.5px;color:var(--ink-soft);margin-bottom:18px;}
+
+  /* ---- app shell (placeholder for next pieces) ---- */
+  #app{display:none;padding-bottom:40px;}
+  .topbar{padding:24px 0 6px;}
+  .topbar .date{font-size:12.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);}
+  .topbar h1{font-size:25px;margin-top:3px;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);}
+  .section-label{font-size:12px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-faint);margin:26px 2px 10px;}
+
+  /* school summary card */
+  .sch-row{display:flex;align-items:center;gap:14px;padding:16px 18px;}
+  .sch-ic{width:42px;height:42px;border-radius:12px;background:var(--wall);display:grid;place-items:center;flex:none;}
+  .sch-ic svg{width:22px;height:22px;stroke:var(--ink-soft);fill:none;stroke-width:1.8;}
+  .sch-info{flex:1;}
+  .sch-info h3{font-size:15.5px;}
+  .sch-info p{margin:2px 0 0;font-size:13px;color:var(--ink-soft);}
+  .sch-edit{font-size:13px;font-weight:700;color:var(--study);}
+
+  .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;font-size:13.5px;font-weight:600;padding:12px 20px;border-radius:30px;
+    opacity:0;pointer-events:none;transition:.25s;z-index:60;white-space:nowrap;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .field-note{font-size:12.5px;color:var(--ink-faint);margin-top:10px;line-height:1.45;}
+
+  .sat-block{margin-top:22px;padding:18px;border:1px solid var(--line);border-radius:16px;background:var(--paper-2);}
+  .sat-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;}
+  .switch{width:48px;height:28px;border-radius:16px;background:var(--line);position:relative;flex:none;transition:.18s;margin-top:2px;}
+  .switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.22);}
+  .switch.on{background:var(--study);}
+  .switch.on::after{left:23px;}
+</style>
+</head>
+<body>
+
+<!-- ================= ONBOARDING ================= -->
+<div id="onb">
+  <div class="onb-top"><div class="steps" id="steps"></div></div>
+  <div class="onb-body" id="onbBody"></div>
+  <div class="onb-foot" id="onbFoot"></div>
+</div>
+
+<!-- ================= APP SHELL ================= -->
+<div id="app">
+  <div class="wrap">
+    <div class="topbar">
+      <div class="date" id="topDate">—</div>
+      <h1>Today</h1>
+    </div>
+    <div class="section-label">Your week</div>
+    <div class="card" id="schoolCard"></div>
+    <div class="section-label">Coming next</div>
+    <p style="color:var(--ink-soft);font-size:14.5px;padding:0 2px;">
+      The daily timeline, study slots, and feedback come in the next build steps. This step set the foundation — your school week — that the whole plan sits on.</p>
+  </div>
+</div>
+
+<!-- school review sheet -->
+<div class="sheet-bg" id="reviewBg">
+  <div class="sheet">
+    <h2>Confirm your school hours</h2>
+    <div class="sub" id="reviewSub">We read these from your timetable. Fix anything that's off — this sets when you're free to study.</div>
+    <div class="timefield" style="margin-bottom:18px">
+      <div class="tf"><label>School starts</label><input type="time" id="rvStart"></div>
+      <div class="tf"><label>School ends</label><input type="time" id="rvEnd"></div>
+    </div>
+    <button class="btn" onclick="acceptReview()">Looks right</button>
+    <button class="btn link" onclick="closeReview()">Enter by hand instead</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   STATE  — the locked foundation starts here.
+   school: one start/end pair + which days have school.
+   (tuitions are day-before paste — built in a later step)
+   ============================================================ */
+let S = load();
+function load(){try{return JSON.parse(localStorage.getItem('bt_state'))||null;}catch(e){return null;}}
+function save(){localStorage.setItem('bt_state',JSON.stringify(S));}
+
+function fresh(){
+  return {
+    created:new Date().toISOString().slice(0,10),
+    school:{start:'08:00',end:'14:00',days:['MO','TU','WE','TH','FR']},
+    // alternating Saturdays: which week-of-month Saturdays have school, with their own hours
+    sat:{on:false,weeks:[1,3],start:'08:00',end:'11:00'},
+    setupDone:false
+  };
+}
+
+/* ---- helpers ---- */
+function t12(t){ if(!t) return '—'; let [h,m]=t.split(':').map(Number);
+  const ap=h>=12?'pm':'am'; h=h%12||12; return h+(m?':'+String(m).padStart(2,'0'):'')+ap; }
+function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');
+  clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),1900);}
+
+/* ============================================================
+   ONBOARDING  — step 1 is school hours (upload or by hand)
+   ============================================================ */
+const DAYS=[['MO','Mon'],['TU','Tue'],['WE','Wed'],['TH','Thu'],['FR','Fri'],['SA','Sat'],['SU','Sun']];
+let onbStep=0;
+let draft={start:'08:00',end:'14:00',days:['MO','TU','WE','TH','FR'],
+  sat:{on:false,weeks:[1,3],start:'08:00',end:'11:00'}};
+
+const STEPS=[
+  {  // welcome
+    render:()=>`
+      <div class="eyebrow">ICSE Class 10</div>
+      <h1>A plan that fits your real day.</h1>
+      <div class="lead">First, your school week — so study only ever lands in the hours you're actually free. Takes a few taps.</div>`,
+    foot:()=>`<button class="btn" onclick="next()">Start</button>`
+  },
+  {  // school hours
+    render:()=>`
+      <div class="eyebrow">Step 1 · School</div>
+      <h1>When are you in school?</h1>
+      <div class="lead">Upload a photo of your timetable and we'll read the times, or just set them yourself.</div>
+
+      <div class="upload-zone" onclick="document.getElementById('schoolFile').click()">
+        <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4l4 4"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
+        <p>Upload timetable photo or PDF</p>
+        <div class="hint">We only read the start and end time</div>
+      </div>
+      <input type="file" id="schoolFile" accept="image/*,application/pdf" style="display:none" onchange="readSchool(event)">
+      <div class="prog" id="schProg" style="display:none"><i id="schBar"></i></div>
+      <div id="schStatus" class="field-note" style="display:none"></div>
+
+      <div class="or">or set by hand</div>
+
+      <div class="timefield">
+        <div class="tf"><label>Starts</label><input type="time" id="obStart" value="${draft.start}" onchange="draft.start=this.value"></div>
+        <div class="tf"><label>Ends</label><input type="time" id="obEnd" value="${draft.end}" onchange="draft.end=this.value"></div>
+      </div>
+
+      <div style="margin-top:20px">
+        <label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:9px">Weekday school days</label>
+        <div class="day-toggle" id="dayToggle">
+          ${DAYS.filter(([k])=>k!=='SA'&&k!=='SU').map(([k,l])=>`<button class="${draft.days.includes(k)?'on':''}" onclick="toggleDay('${k}',this)">${l}</button>`).join('')}
+        </div>
+      </div>
+
+      <div class="sat-block">
+        <div class="sat-head">
+          <div>
+            <h3 style="font-size:15px">Saturday school</h3>
+            <p style="margin:2px 0 0;font-size:13px;color:var(--ink-soft)">Some ICSE schools run alternate Saturdays, with shorter hours.</p>
+          </div>
+          <div class="switch ${draft.sat.on?'on':''}" id="satSwitch" onclick="toggleSat()"></div>
+        </div>
+        <div id="satDetail" style="display:${draft.sat.on?'block':'none'}">
+          <div class="timefield" style="margin-top:16px">
+            <div class="tf"><label>Sat starts</label><input type="time" id="satStart" value="${draft.sat.start}" onchange="draft.sat.start=this.value"></div>
+            <div class="tf"><label>Sat ends</label><input type="time" id="satEnd" value="${draft.sat.end}" onchange="draft.sat.end=this.value"></div>
+          </div>
+          <label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:16px 0 9px">Which Saturdays</label>
+          <div class="day-toggle" id="satWeeks">
+            ${[1,2,3,4,5].map(w=>`<button class="${draft.sat.weeks.includes(w)?'on':''}" onclick="toggleSatWeek(${w},this)">${['1st','2nd','3rd','4th','5th'][w-1]}</button>`).join('')}
+          </div>
+          <div class="field-note">Tap the Saturdays your school runs. A 5th Saturday is usually off.</div>
+        </div>
+      </div>`,
+    foot:()=>`<button class="btn" onclick="finishSetup()">Save my week</button>`
+  }
+];
+
+function renderSteps(){
+  const s=document.getElementById('steps');
+  s.innerHTML=STEPS.map((_,i)=>`<i class="${i<=onbStep?'on':''}"></i>`).join('');
+}
+function renderOnb(){
+  renderSteps();
+  document.getElementById('onbBody').innerHTML=STEPS[onbStep].render();
+  document.getElementById('onbFoot').innerHTML=STEPS[onbStep].foot();
+}
+function next(){ if(onbStep<STEPS.length-1){onbStep++;renderOnb();} }
+function toggleDay(k,el){
+  const i=draft.days.indexOf(k);
+  if(i>=0)draft.days.splice(i,1); else draft.days.push(k);
+  el.classList.toggle('on');
+}
+function toggleSat(){
+  draft.sat.on=!draft.sat.on;
+  document.getElementById('satSwitch').classList.toggle('on',draft.sat.on);
+  document.getElementById('satDetail').style.display=draft.sat.on?'block':'none';
+}
+function toggleSatWeek(w,el){
+  const i=draft.sat.weeks.indexOf(w);
+  if(i>=0)draft.sat.weeks.splice(i,1); else draft.sat.weeks.push(w);
+  el.classList.toggle('on');
+}
+
+/* ---- school timetable OCR (start/end only, confirm after) ---- */
+async function readSchool(ev){
+  const f=ev.target.files[0]; if(!f) return; ev.target.value='';
+  const prog=document.getElementById('schProg'), bar=document.getElementById('schBar'),
+        st=document.getElementById('schStatus');
+  prog.style.display='block'; st.style.display='block';
+  st.textContent='Reading your timetable on your device…'; bar.style.width='8%';
+  let text='';
+  try{
+    const res=await Tesseract.recognize(f,'eng',{logger:m=>{
+      if(m.status==='recognizing text') bar.style.width=Math.round(8+m.progress*88)+'%';}});
+    text=res.data.text||'';
+  }catch(e){ prog.style.display='none'; st.textContent='Could not read that one. Try a clearer photo, or set the times by hand below.'; return; }
+  prog.style.display='none'; st.style.display='none';
+  const times=extractTimes(text);
+  openReview(times);
+}
+// pull the earliest and latest clock times from messy OCR text
+function extractTimes(text){
+  const re=/\b(\d{1,2})[:.\s]?(\d{2})\s*(a\.?m|p\.?m)?\b/gi;
+  let m, mins=[];
+  while((m=re.exec(text))){
+    let h=+m[1], min=+m[2]; if(h>23||min>59) continue;
+    const ap=(m[3]||'').toLowerCase().replace(/\./g,'');
+    if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0;
+    mins.push(h*60+min);
+  }
+  if(mins.length<2) return null;
+  mins.sort((a,b)=>a-b);
+  const fmt=v=>String(Math.floor(v/60)).padStart(2,'0')+':'+String(v%60).padStart(2,'0');
+  // school day is plausibly between 6am and 6pm
+  const inDay=mins.filter(v=>v>=360&&v<=1080);
+  const lo=inDay.length?inDay[0]:mins[0], hi=inDay.length?inDay[inDay.length-1]:mins[mins.length-1];
+  return {start:fmt(lo),end:fmt(hi)};
+}
+function openReview(times){
+  const sub=document.getElementById('reviewSub');
+  if(times){ document.getElementById('rvStart').value=times.start;
+    document.getElementById('rvEnd').value=times.end;
+    sub.textContent="We read these from your timetable. Fix anything that's off — this sets when you're free to study.";
+  }else{
+    document.getElementById('rvStart').value=draft.start;
+    document.getElementById('rvEnd').value=draft.end;
+    sub.textContent="We couldn't pick out the times. Set them here and they'll save.";
+  }
+  document.getElementById('reviewBg').classList.add('show');
+}
+function closeReview(){document.getElementById('reviewBg').classList.remove('show');}
+function acceptReview(){
+  draft.start=document.getElementById('rvStart').value||draft.start;
+  draft.end=document.getElementById('rvEnd').value||draft.end;
+  closeReview();
+  const s=document.getElementById('obStart'), e=document.getElementById('obEnd');
+  if(s)s.value=draft.start; if(e)e.value=draft.end;
+  toast('School hours set — check the days below');
+}
+
+function finishSetup(){
+  if(!draft.days.length){toast('Pick at least one school day');return;}
+  if(draft.start>=draft.end){toast('End time should be after start');return;}
+  if(draft.sat.on){
+    if(!draft.sat.weeks.length){toast('Pick which Saturdays, or turn Saturday off');return;}
+    if(draft.sat.start>=draft.sat.end){toast('Saturday end should be after start');return;}
+  }
+  S=fresh();
+  S.school={start:draft.start,end:draft.end,days:draft.days};
+  S.sat={on:draft.sat.on,weeks:[...draft.sat.weeks].sort(),start:draft.sat.start,end:draft.sat.end};
+  S.setupDone=true;
+  save();
+  boot();
+}
+
+/* ============================================================
+   APP SHELL  — shows the saved foundation; rest comes next steps
+   ============================================================ */
+function boot(){
+  document.getElementById('onb').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('topDate').textContent=
+    new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
+  renderSchoolCard();
+}
+function renderSchoolCard(){
+  const sc=S.school;
+  const dayLabels=DAYS.filter(([k])=>sc.days.includes(k)).map(([,l])=>l).join(' · ');
+  let satLine='';
+  if(S.sat&&S.sat.on){
+    const wk=S.sat.weeks.map(w=>['1st','2nd','3rd','4th','5th'][w-1]).join(', ');
+    satLine=`<p>${wk} Sat · ${t12(S.sat.start)} – ${t12(S.sat.end)}</p>`;
+  }
+  document.getElementById('schoolCard').innerHTML=`
+    <div class="sch-row">
+      <div class="sch-ic"><svg viewBox="0 0 24 24"><path d="M3 9l9-5 9 5-9 5-9-5z"/><path d="M3 9v6l9 5 9-5V9"/></svg></div>
+      <div class="sch-info">
+        <h3>School ${t12(sc.start)} – ${t12(sc.end)}</h3>
+        <p>${dayLabels}</p>
+        ${satLine}
+      </div>
+      <button class="sch-edit" onclick="editSchool()">Edit</button>
+    </div>`;
+}
+function editSchool(){
+  draft={start:S.school.start,end:S.school.end,days:[...S.school.days],
+    sat:S.sat?{on:S.sat.on,weeks:[...S.sat.weeks],start:S.sat.start,end:S.sat.end}
+             :{on:false,weeks:[1,3],start:'08:00',end:'11:00'}};
+  onbStep=1;
+  document.getElementById('app').style.display='none';
+  document.getElementById('onb').style.display='flex';
+  renderOnb();
+}
+
+/* ---- start ---- */
+if(S&&S.setupDone){ boot(); }
+else { renderOnb(); }
+</script>
+</body>
+</html>
