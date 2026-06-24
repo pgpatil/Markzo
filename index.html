@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>Board Track — ICSE 10 study planner</title>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<title>Markzo — ICSE 10 study planner</title>
+<script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <style>
   :root{
     --paper:#f5f1e8;
@@ -113,6 +113,43 @@
   .switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.22);}
   .switch.on{background:var(--study);}
   .switch.on::after{left:23px;}
+
+  .block-draft{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--paper-2);margin-bottom:12px;}
+
+  /* day nav */
+  .day-nav{display:flex;gap:7px;margin:16px 0 18px;overflow-x:auto;scrollbar-width:none;}
+  .day-nav::-webkit-scrollbar{display:none;}
+  .dn{flex:none;width:50px;padding:9px 0;border-radius:13px;background:var(--card);border:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .dn .dn-d{font-size:11px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.04em;}
+  .dn .dn-n{font-size:15px;font-weight:700;color:var(--ink);}
+  .dn.on{background:var(--ink);border-color:var(--ink);}
+  .dn.on .dn-d,.dn.on .dn-n{color:#fff;}
+  .dn-month{flex:none;display:flex;align-items:center;font-size:11px;font-weight:800;letter-spacing:.05em;
+    text-transform:uppercase;color:var(--test);padding:0 4px;writing-mode:vertical-rl;transform:rotate(180deg);}
+
+  /* timeline */
+  .timeline{position:relative;padding-left:4px;}
+  .seg{display:flex;gap:14px;align-items:flex-start;padding:13px 15px;border-radius:14px;margin-bottom:9px;border:1px solid var(--line);}
+  .seg-time{font-size:12.5px;font-weight:700;color:var(--ink-faint);min-width:54px;padding-top:1px;}
+  .seg-body{flex:1;}
+  .seg-title{font-size:15px;font-weight:650;}
+  .seg-note{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .seg-school{background:var(--wall);border-color:#ddd5c3;}
+  .seg-block{background:var(--test-soft);border-color:#eed9bd;}
+  .seg-sleep{background:#f0eef4;border-color:#e4e0ea;opacity:.78;}
+  .seg-sleep .seg-title{color:var(--ink-soft);font-weight:600;}
+  .seg-study{background:var(--study-soft);border-color:#cfe6da;border-style:solid;}
+  .seg-study .seg-title{color:var(--study);}
+
+  /* setup fold */
+  .setup-fold{margin-top:26px;border-top:1px solid var(--line);padding-top:8px;}
+  .setup-fold summary{font-size:13.5px;font-weight:650;color:var(--ink-soft);padding:12px 2px;cursor:pointer;list-style:none;}
+  .setup-fold summary::-webkit-details-marker{display:none;}
+  .setup-fold summary::before{content:"⚙  ";}
+  .rt-block{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;font-size:14.5px;border-top:1px dashed var(--line);}
+  .rt-block:first-child{border-top:none;}
+  .rt-block .rt-time{font-size:13px;color:var(--ink-soft);white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -131,11 +168,17 @@
       <div class="date" id="topDate">—</div>
       <h1>Today</h1>
     </div>
-    <div class="section-label">Your week</div>
-    <div class="card" id="schoolCard"></div>
-    <div class="section-label">Coming next</div>
-    <p style="color:var(--ink-soft);font-size:14.5px;padding:0 2px;">
-      The daily timeline, study slots, and feedback come in the next build steps. This step set the foundation — your school week — that the whole plan sits on.</p>
+
+    <div id="dayNav" class="day-nav"></div>
+    <div class="timeline" id="timeline"></div>
+
+    <details class="setup-fold">
+      <summary>Your school &amp; daily routine</summary>
+      <div class="section-label">Your week</div>
+      <div class="card" id="schoolCard"></div>
+      <div class="section-label">Your day</div>
+      <div class="card" id="rhythmCard"></div>
+    </details>
   </div>
 </div>
 
@@ -171,6 +214,11 @@ function fresh(){
     school:{start:'08:00',end:'14:00',days:['MO','TU','WE','TH','FR']},
     // alternating Saturdays: which week-of-month Saturdays have school, with their own hours
     sat:{on:false,weeks:[1,3],start:'08:00',end:'11:00'},
+    // daily rhythm: wake/sleep plus user-added fixed blocks, each with its own days
+    wake:{time:'06:30',days:['MO','TU','WE','TH','FR','SA','SU']},
+    sleep:{time:'22:30',days:['MO','TU','WE','TH','FR','SA','SU']},
+    blocks:[],   // {id,name,start,end,days:[...]}
+    rhythmDone:false,
     setupDone:false
   };
 }
@@ -188,6 +236,13 @@ const DAYS=[['MO','Mon'],['TU','Tue'],['WE','Wed'],['TH','Thu'],['FR','Fri'],['S
 let onbStep=0;
 let draft={start:'08:00',end:'14:00',days:['MO','TU','WE','TH','FR'],
   sat:{on:false,weeks:[1,3],start:'08:00',end:'11:00'}};
+let rdraft={
+  wake:{time:'06:30',days:['MO','TU','WE','TH','FR','SA','SU']},
+  sleep:{time:'22:30',days:['MO','TU','WE','TH','FR','SA','SU']},
+  blocks:[]
+};
+let blockSeq=1;
+const ALLDAYS=['MO','TU','WE','TH','FR','SA','SU'];
 
 const STEPS=[
   {  // welcome
@@ -246,7 +301,24 @@ const STEPS=[
           <div class="field-note">Tap the Saturdays your school runs. A 5th Saturday is usually off.</div>
         </div>
       </div>`,
-    foot:()=>`<button class="btn" onclick="finishSetup()">Save my week</button>`
+    foot:()=>`<button class="btn" onclick="saveSchoolStep()">Next</button>`
+  },
+  {  // daily rhythm: wake, sleep, custom blocks
+    render:()=>`
+      <div class="eyebrow">Step 2 · Your day</div>
+      <h1>When does your day run?</h1>
+      <div class="lead">So study never lands while you're asleep, eating, or out. Set your wake and sleep, then add anything fixed — tuition, meals, gym, prayer. You can change all of this later in a tap.</div>
+
+      <div class="timefield">
+        <div class="tf"><label>Wake up</label><input type="time" id="obWake" value="${rdraft.wake.time}" onchange="rdraft.wake.time=this.value"></div>
+        <div class="tf"><label>Sleep</label><input type="time" id="obSleep" value="${rdraft.sleep.time}" onchange="rdraft.sleep.time=this.value"></div>
+      </div>
+
+      <div class="section-label" style="margin:24px 2px 10px">Fixed blocks</div>
+      <div id="blockList">${renderBlockDrafts()}</div>
+      <button class="btn ghost" style="margin-top:12px" onclick="addBlockDraft()">+ Add a block</button>
+      <div class="field-note">Add meals, tuition, gym, travel — anything that repeats. Each can run on its own days.</div>`,
+    foot:()=>`<button class="btn" onclick="finishSetup()">Save my routine</button>`
   }
 ];
 
@@ -274,6 +346,80 @@ function toggleSatWeek(w,el){
   const i=draft.sat.weeks.indexOf(w);
   if(i>=0)draft.sat.weeks.splice(i,1); else draft.sat.weeks.push(w);
   el.classList.toggle('on');
+}
+
+/* ---- rhythm: custom blocks ---- */
+function renderBlockDrafts(){
+  if(!rdraft.blocks.length) return '<div class="field-note" style="margin:0 0 4px">No blocks yet. Lunch and tuition are good ones to add.</div>';
+  return rdraft.blocks.map(b=>`
+    <div class="block-draft" data-id="${b.id}">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <input type="text" placeholder="Name (e.g. Lunch)" value="${b.name||''}"
+          oninput="setBlock(${b.id},'name',this.value)"
+          style="flex:1;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--card);font-size:15px">
+        <button onclick="removeBlock(${b.id})" style="color:#c0392b;font-weight:700;font-size:13px;padding:8px">Remove</button>
+      </div>
+      <div class="timefield" style="margin-bottom:10px">
+        <div class="tf"><label>Start</label><input type="time" value="${b.start}" onchange="setBlockStart(${b.id},this.value)"></div>
+        <div class="tf"><label>Minutes</label><input type="number" min="5" step="5" value="${b.mins}" onchange="setBlockMins(${b.id},this.value)" inputmode="numeric"></div>
+        <div class="tf"><label>Ends</label><input type="time" value="${b.end}" disabled style="opacity:.7"></div>
+      </div>
+      <div class="day-toggle">
+        ${DAYS.map(([k,l])=>`<button class="${b.days.includes(k)?'on':''}" onclick="toggleBlockDay(${b.id},'${k}',this)">${l[0]}</button>`).join('')}
+      </div>
+      ${b.days.includes('SA')?`
+        <div style="margin-top:10px">
+          <label style="display:block;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:7px">Which Saturdays</label>
+          <div class="day-toggle">
+            ${[1,2,3,4,5].map(w=>`<button class="${(b.satWeeks||[1,2,3,4,5]).includes(w)?'on':''}" onclick="toggleBlockSatWeek(${b.id},${w},this)">${['1st','2nd','3rd','4th','5th'][w-1]}</button>`).join('')}
+          </div>
+          <div class="field-note" style="margin-top:7px">Leave all on for every Saturday, or pick specific ones.</div>
+        </div>`:''}
+    </div>`).join('');
+}
+function addBlockDraft(){
+  rdraft.blocks.push({id:blockSeq++,name:'',start:'13:00',mins:60,end:'14:00',days:[...ALLDAYS]});
+  document.getElementById('blockList').innerHTML=renderBlockDrafts();
+}
+function setBlock(id,k,v){const b=rdraft.blocks.find(x=>x.id===id);if(b)b[k]=v;}
+function addMins(t,mins){
+  let [h,m]=t.split(':').map(Number);
+  let total=h*60+m+ (parseInt(mins,10)||0);
+  total=((total%1440)+1440)%1440;
+  return String(Math.floor(total/60)).padStart(2,'0')+':'+String(total%60).padStart(2,'0');
+}
+function setBlockStart(id,v){const b=rdraft.blocks.find(x=>x.id===id);if(!b)return;
+  b.start=v; b.end=addMins(b.start,b.mins);
+  document.getElementById('blockList').innerHTML=renderBlockDrafts();}
+function setBlockMins(id,v){const b=rdraft.blocks.find(x=>x.id===id);if(!b)return;
+  b.mins=Math.max(5,parseInt(v,10)||5); b.end=addMins(b.start,b.mins);
+  document.getElementById('blockList').innerHTML=renderBlockDrafts();}
+function removeBlock(id){rdraft.blocks=rdraft.blocks.filter(x=>x.id!==id);
+  document.getElementById('blockList').innerHTML=renderBlockDrafts();}
+function toggleBlockDay(id,k,el){
+  const b=rdraft.blocks.find(x=>x.id===id);if(!b)return;
+  const i=b.days.indexOf(k); if(i>=0)b.days.splice(i,1); else b.days.push(k);
+  if(k==='SA'){ // show/hide the saturday-week selector
+    if(!b.satWeeks)b.satWeeks=[1,2,3,4,5];
+    document.getElementById('blockList').innerHTML=renderBlockDrafts();
+  } else { el.classList.toggle('on'); }
+}
+function toggleBlockSatWeek(id,w,el){
+  const b=rdraft.blocks.find(x=>x.id===id);if(!b)return;
+  if(!b.satWeeks)b.satWeeks=[1,2,3,4,5];
+  const i=b.satWeeks.indexOf(w); if(i>=0)b.satWeeks.splice(i,1); else b.satWeeks.push(w);
+  el.classList.toggle('on');
+}
+
+/* ---- school step: validate, then advance to rhythm ---- */
+function saveSchoolStep(){
+  if(!draft.days.length){toast('Pick at least one school day');return;}
+  if(draft.start>=draft.end){toast('End time should be after start');return;}
+  if(draft.sat.on){
+    if(!draft.sat.weeks.length){toast('Pick which Saturdays, or turn Saturday off');return;}
+    if(draft.sat.start>=draft.sat.end){toast('Saturday end should be after start');return;}
+  }
+  next();
 }
 
 /* ---- school timetable OCR (start/end only, confirm after) ---- */
@@ -334,29 +480,138 @@ function acceptReview(){
 }
 
 function finishSetup(){
-  if(!draft.days.length){toast('Pick at least one school day');return;}
-  if(draft.start>=draft.end){toast('End time should be after start');return;}
-  if(draft.sat.on){
-    if(!draft.sat.weeks.length){toast('Pick which Saturdays, or turn Saturday off');return;}
-    if(draft.sat.start>=draft.sat.end){toast('Saturday end should be after start');return;}
+  // validate blocks
+  for(const b of rdraft.blocks){
+    if(!b.name.trim()){toast('Name each block, or remove it');return;}
+    if(b.start>=b.end){toast(b.name+': end should be after start');return;}
+    if(!b.days.length){toast(b.name+': pick at least one day');return;}
   }
-  S=fresh();
+  if(!S) S=fresh();
   S.school={start:draft.start,end:draft.end,days:draft.days};
   S.sat={on:draft.sat.on,weeks:[...draft.sat.weeks].sort(),start:draft.sat.start,end:draft.sat.end};
+  S.wake={time:rdraft.wake.time,days:[...ALLDAYS]};
+  S.sleep={time:rdraft.sleep.time,days:[...ALLDAYS]};
+  S.blocks=rdraft.blocks.map(b=>({id:b.id,name:b.name.trim(),start:b.start,mins:b.mins,end:b.end,days:[...b.days],satWeeks:b.days.includes('SA')?[...(b.satWeeks||[1,2,3,4,5])]:undefined}));
+  S.rhythmDone=true;
   S.setupDone=true;
   save();
   boot();
 }
 
 /* ============================================================
+   TIMELINE  — builds the day from fixed layers, study fills gaps
+   Window 5:00 (300) to 24:00 (1440). Min study gap 30 min.
+   ============================================================ */
+const DAY_START=300, DAY_END=1440, MIN_GAP=30;
+const DOW=['SU','MO','TU','WE','TH','FR','SA'];
+let viewDate=new Date();
+
+function m2t(m){if(m>=1440)return '12am';let h=Math.floor(m/60),mm=m%60;const ap=h>=12?'pm':'am';let hh=h%12||12;
+  return hh+(mm?':'+String(mm).padStart(2,'0'):'')+ap;}
+function hm2m(t){const [h,m]=t.split(':').map(Number);return h*60+m;}
+function weekOfMonth(d){return Math.floor((d.getDate()-1)/7)+1;}
+
+function fixedFor(date){
+  const dk=DOW[date.getDay()];
+  const out=[];
+  if(S.school.days.includes(dk) && dk!=='SA'){
+    out.push({name:'School',start:hm2m(S.school.start),end:hm2m(S.school.end),kind:'school'});
+  }
+  if(dk==='SA' && S.sat&&S.sat.on && S.sat.weeks.includes(weekOfMonth(date))){
+    out.push({name:'School',start:hm2m(S.sat.start),end:hm2m(S.sat.end),kind:'school'});
+  }
+  for(const b of (S.blocks||[])){
+    if(!b.days.includes(dk)) continue;
+    // Saturday blocks may be limited to specific weeks of the month
+    if(dk==='SA' && b.satWeeks && !b.satWeeks.includes(weekOfMonth(date))) continue;
+    out.push({name:b.name,start:hm2m(b.start),end:hm2m(b.end),kind:'block'});
+  }
+  return out.sort((a,b)=>a.start-b.start);
+}
+
+function buildDay(date){
+  const wake=hm2m(S.wake.time), sleep=hm2m(S.sleep.time);
+  let fixed=fixedFor(date).filter(f=>f.end>f.start);
+  const segs=[];
+  if(wake>DAY_START) segs.push({type:'sleep',start:DAY_START,end:wake,name:'Asleep'});
+  let cursor=Math.max(wake,DAY_START);
+  for(const f of fixed){
+    const s=Math.max(f.start,cursor), e=f.end;
+    if(s>cursor) addGap(segs,cursor,s);
+    if(e>s){ segs.push({type:f.kind,start:s,end:e,name:f.name}); cursor=Math.max(cursor,e); }
+  }
+  if(cursor<sleep) addGap(segs,cursor,sleep);
+  if(sleep<DAY_END) segs.push({type:'sleep',start:Math.max(sleep,cursor),end:DAY_END,name:'Asleep'});
+  return segs;
+}
+function addGap(segs,s,e){
+  const dur=e-s;
+  if(dur>=MIN_GAP) segs.push({type:'study',start:s,end:e,name:'Free to study',mins:dur});
+  else if(dur>0) segs.push({type:'tiny',start:s,end:e,name:'Short break',mins:dur});
+}
+
+function renderTimeline(){
+  const segs=buildDay(viewDate);
+  const host=document.getElementById('timeline');
+  let html='';
+  for(const s of segs){
+    if(s.type==='tiny') continue;
+    const dur=s.end-s.start;
+    if(s.type==='study'){
+      const lab=s.mins>=60?(Math.floor(s.mins/60)+'h'+(s.mins%60?(' '+(s.mins%60)+'m'):'')):s.mins+'m';
+      html+=`<div class="seg seg-study" style="min-height:${Math.max(54,Math.min(dur*0.7,150))}px">
+        <div class="seg-time">${m2t(s.start)}</div>
+        <div class="seg-body">
+          <div class="seg-title">Free to study · ${lab}</div>
+          <div class="seg-note">Chapters fill in once your subjects &amp; tests are set</div>
+        </div></div>`;
+    }else{
+      html+=`<div class="seg seg-${s.type}">
+        <div class="seg-time">${m2t(s.start)}</div>
+        <div class="seg-body">
+          <div class="seg-title">${s.name}</div>
+          <div class="seg-note">${m2t(s.start)} – ${m2t(s.end)}</div>
+        </div></div>`;
+    }
+  }
+  host.innerHTML=html||'<div style="padding:30px;text-align:center;color:var(--ink-faint)">Nothing set for this day.</div>';
+  renderDayNav();
+}
+
+function renderDayNav(){
+  const nav=document.getElementById('dayNav');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const days=[];
+  for(let i=0;i<60;i++){const d=new Date();d.setDate(d.getDate()+i);d.setHours(0,0,0,0);days.push(d);}
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  nav.innerHTML=days.map((d,idx)=>{
+    const sel=d.toDateString()===new Date(viewDate).toDateString();
+    const isToday=d.getTime()===today.getTime();
+    const newMonth=idx===0||d.getDate()===1;
+    return `${newMonth?`<div class="dn-month">${MON[d.getMonth()]}</div>`:''}
+      <button class="dn ${sel?'on':''}" onclick="pickDay(${d.getTime()})">
+        <span class="dn-d">${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}</span>
+        <span class="dn-n">${isToday?'•':d.getDate()}</span></button>`;
+  }).join('');
+}
+function pickDay(ts){viewDate=new Date(ts);renderTimeline();}
+
+/* ============================================================
    APP SHELL  — shows the saved foundation; rest comes next steps
    ============================================================ */
 function boot(){
+  // backfill rhythm fields for state saved before this step existed
+  if(S){ if(!S.wake)S.wake={time:'06:30',days:[...ALLDAYS]};
+    if(!S.sleep)S.sleep={time:'22:30',days:[...ALLDAYS]};
+    if(!S.blocks)S.blocks=[]; }
   document.getElementById('onb').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('topDate').textContent=
     new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   renderSchoolCard();
+  renderRhythmCard();
+  viewDate=new Date();
+  renderTimeline();
 }
 function renderSchoolCard(){
   const sc=S.school;
@@ -377,19 +632,63 @@ function renderSchoolCard(){
       <button class="sch-edit" onclick="editSchool()">Edit</button>
     </div>`;
 }
-function editSchool(){
+function renderRhythmCard(){
+  const el=document.getElementById('rhythmCard');
+  if(!el) return;
+  const blocks=(S.blocks||[]).slice().sort((a,b)=>a.start<b.start?-1:1);
+  const blockLines=blocks.length
+    ? blocks.map(b=>{
+        const dl=b.days.length===7?'every day':DAYS.filter(([k])=>b.days.includes(k)).map(([,l])=>l[0]).join('');
+        return `<div class="rt-block"><span>${b.name}</span><span class="rt-time">${t12(b.start)}–${t12(b.end)} · ${dl}</span></div>`;
+      }).join('')
+    : '<div class="rt-block" style="color:var(--ink-faint)">No fixed blocks yet</div>';
+  el.innerHTML=`
+    <div class="sch-row" style="border-bottom:1px solid var(--line)">
+      <div class="sch-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      <div class="sch-info">
+        <h3>Awake ${t12(S.wake.time)} – ${t12(S.sleep.time)}</h3>
+        <p>${blocks.length} fixed block${blocks.length!==1?'s':''} in your day</p>
+      </div>
+      <button class="sch-edit" onclick="editRhythm()">Edit</button>
+    </div>
+    <div style="padding:12px 18px 16px">${blockLines}</div>`;
+}
+
+function seedDraftsFromState(){
   draft={start:S.school.start,end:S.school.end,days:[...S.school.days],
     sat:S.sat?{on:S.sat.on,weeks:[...S.sat.weeks],start:S.sat.start,end:S.sat.end}
              :{on:false,weeks:[1,3],start:'08:00',end:'11:00'}};
-  onbStep=1;
+  rdraft={
+    wake:{time:S.wake?S.wake.time:'06:30',days:[...ALLDAYS]},
+    sleep:{time:S.sleep?S.sleep.time:'22:30',days:[...ALLDAYS]},
+    blocks:(S.blocks||[]).map(b=>({id:b.id,name:b.name,start:b.start,
+      mins:b.mins||Math.max(5,(parseInt(b.end.split(':')[0])*60+parseInt(b.end.split(':')[1]))-(parseInt(b.start.split(':')[0])*60+parseInt(b.start.split(':')[1]))),
+      end:b.end,days:[...b.days],satWeeks:b.satWeeks?[...b.satWeeks]:undefined}))
+  };
+  blockSeq=Math.max(1,...(S.blocks||[]).map(b=>b.id||0))+1;
+}
+function openOnbAt(step){
+  onbStep=step;
   document.getElementById('app').style.display='none';
   document.getElementById('onb').style.display='flex';
   renderOnb();
 }
+function editSchool(){ seedDraftsFromState(); openOnbAt(1); }
+function editRhythm(){ seedDraftsFromState(); openOnbAt(2); }
 
 /* ---- start ---- */
-if(S&&S.setupDone){ boot(); }
-else { renderOnb(); }
+try{
+  if(S&&S.setupDone){ boot(); }
+  else { renderOnb(); }
+}catch(err){
+  // never leave a blank screen; show a recovery option
+  document.body.innerHTML='<div style="max-width:480px;margin:60px auto;padding:0 24px;font-family:Inter,sans-serif;color:#23252b">'
+    +'<h1 style="font-size:24px;margin-bottom:10px">Something went wrong loading your data</h1>'
+    +'<p style="color:#5c6068;font-size:15px;line-height:1.5">This can happen after an update. You can reset and set up again — it takes a minute.</p>'
+    +'<button onclick="localStorage.removeItem(\'bt_state\');location.reload()" '
+    +'style="margin-top:18px;background:#3a7d5d;color:#fff;border:none;padding:14px 20px;border-radius:13px;font-size:15px;font-weight:650;width:100%">Reset and start over</button>'
+    +'<p style="color:#9a9ea7;font-size:12.5px;margin-top:14px">Error: '+(err&&err.message||'unknown')+'</p></div>';
+}
 </script>
 </body>
 </html>
