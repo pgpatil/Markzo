@@ -27,7 +27,7 @@
   body{
     font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
     background:var(--paper);color:var(--ink);font-size:16px;line-height:1.5;
-    -webkit-font-smoothing:antialiased;
+    -webkit-font-smoothing:antialiased;padding-bottom:80px;
   }
   h1,h2,h3{margin:0;font-weight:680;letter-spacing:-.015em;}
   button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit;}
@@ -141,6 +141,8 @@
   .seg-sleep .seg-title{color:var(--ink-soft);font-weight:600;}
   .seg-study{background:var(--study-soft);border-color:#cfe6da;border-style:solid;}
   .seg-study .seg-title{color:var(--study);}
+  .seg-study.has-task{background:#fff;border-color:var(--study);border-left:4px solid var(--study);}
+  .seg-study.has-task .seg-title{color:var(--ink);font-weight:680;}
 
   /* setup fold */
   .setup-fold{margin-top:26px;border-top:1px solid var(--line);padding-top:8px;}
@@ -192,12 +194,7 @@
   .mc-dot.lvl1{background:#cfe6da;} .mc-dot.lvl2{background:#8fc6ab;} .mc-dot.lvl3{background:var(--study);}
   .mc-school-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#c9bfa6;margin-right:5px;vertical-align:middle;}
 
-  /* syllabus screen */
-  #syllabusScreen{display:none;min-height:100vh;background:var(--paper);}
-  .syl-top{position:sticky;top:0;background:var(--paper);border-bottom:1px solid var(--line);
-    padding:16px 20px calc(14px);display:flex;align-items:center;gap:14px;z-index:5;max-width:480px;margin:0 auto;}
-  .syl-back{font-size:15px;font-weight:700;color:var(--study);}
-  .syl-top h2{font-size:17px;}
+  /* syllabus (inline on setup page) */
   .syl-intro{font-size:13.5px;color:var(--ink-soft);line-height:1.5;margin:18px 2px;}
   .subj-chips{display:flex;flex-wrap:wrap;gap:8px;}
   .subj-chip{font-size:13.5px;font-weight:600;padding:9px 14px;border-radius:22px;border:1px solid var(--line);background:var(--card);color:var(--ink-soft);}
@@ -221,6 +218,16 @@
   .wt-mini button{width:24px;height:24px;border-radius:7px;border:1px solid var(--line);background:var(--card);font-size:14px;font-weight:700;color:var(--ink-faint);}
   .wt-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
   .wt-dot.wt1{background:#cfe6da;} .wt-dot.wt2{background:#7bbd9d;} .wt-dot.wt3{background:var(--study);}
+  .add-chap{margin:8px 8px 4px;font-size:13px;font-weight:650;color:var(--study);padding:8px 0;}
+
+  /* bottom nav */
+  #bottomNav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;justify-content:center;gap:8px;
+    background:rgba(245,241,232,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line);
+    padding:8px 0 calc(8px + env(safe-area-inset-bottom));}
+  .bn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 26px;border-radius:12px;color:var(--ink-faint);}
+  .bn svg{width:23px;height:23px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;}
+  .bn span{font-size:11px;font-weight:650;}
+  .bn.on{color:var(--study);}
   .rt-block{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;font-size:14.5px;border-top:1px dashed var(--line);}
   .rt-block:first-child{border-top:none;}
   .rt-block .rt-time{font-size:13px;color:var(--ink-soft);white-space:nowrap;}
@@ -240,45 +247,43 @@
   <div class="wrap">
     <div class="topbar">
       <div class="date" id="topDate">—</div>
-      <h1>Today</h1>
+      <h1 id="appTitle">Today</h1>
     </div>
 
-    <div class="view-toggle" id="viewToggle">
-      <button data-v="day" class="on" onclick="setView('day')">Day</button>
-      <button data-v="week" onclick="setView('week')">Week</button>
-      <button data-v="month" onclick="setView('month')">Month</button>
+    <!-- HOME PAGE -->
+    <div id="page-home">
+      <div class="view-toggle" id="viewToggle">
+        <button data-v="day" class="on" onclick="setView('day')">Day</button>
+        <button data-v="week" onclick="setView('week')">Week</button>
+        <button data-v="month" onclick="setView('month')">Month</button>
+      </div>
+      <div id="view-day">
+        <div id="dayNav" class="day-nav"></div>
+        <div class="timeline" id="timeline"></div>
+      </div>
+      <div id="view-week" style="display:none"></div>
+      <div id="view-month" style="display:none"></div>
     </div>
 
-    <div id="view-day">
-      <div id="dayNav" class="day-nav"></div>
-      <div class="timeline" id="timeline"></div>
-    </div>
-    <div id="view-week" style="display:none"></div>
-    <div id="view-month" style="display:none"></div>
-
-    <details class="setup-fold">
-      <summary>Your school &amp; daily routine</summary>
-      <div class="section-label">Your week</div>
-      <div class="card" id="schoolCard"></div>
-      <div class="section-label">Your day</div>
-      <div class="card" id="rhythmCard"></div>
+    <!-- SETUP PAGE -->
+    <div id="page-setup" style="display:none">
       <div class="section-label">Subjects &amp; syllabus</div>
-      <div class="card" id="subjectsCard"></div>
-    </details>
+      <div id="syllabusBody"></div>
+      <div class="section-label" style="margin-top:26px">Your school week</div>
+      <div class="card" id="schoolCard"></div>
+      <div class="section-label">Your daily routine</div>
+      <div class="card" id="rhythmCard"></div>
+    </div>
   </div>
 </div>
 
-<!-- ================= SYLLABUS SCREEN ================= -->
-<div id="syllabusScreen">
-  <div class="syl-top">
-    <button class="syl-back" onclick="closeSyllabus()">‹ Done</button>
-    <h2>Subjects &amp; syllabus</h2>
-  </div>
-  <div class="wrap">
-    <p class="syl-intro">Turn off subjects you don't take and chapters your school has left out. Tune each chapter's weight — heavier chapters get more study time. The plan uses all of this.</p>
-    <div id="syllabusBody"></div>
-  </div>
-</div>
+<!-- bottom nav -->
+<nav id="bottomNav">
+  <button class="bn on" data-p="home" onclick="setPage('home')">
+    <svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Today</span></button>
+  <button class="bn" data-p="setup" onclick="setPage('setup')">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1l2-1.6-2-3.4-2.4 1a7 7 0 00-1.7-1l-.4-2.5h-4l-.4 2.5a7 7 0 00-1.7 1l-2.4-1-2 3.4 2 1.6a7 7 0 000 2l-2 1.6 2 3.4 2.4-1a7 7 0 001.7 1l.4 2.5h4l.4-2.5a7 7 0 001.7-1l2.4 1 2-3.4-2-1.6a7 7 0 00.1-1z"/></svg><span>Setup</span></button>
+</nav>
 
 <!-- school review sheet -->
 <div class="sheet-bg" id="reviewBg">
@@ -684,11 +689,13 @@ function renderTimeline(){
     const dur=s.end-s.start;
     if(s.type==='study'){
       const lab=s.mins>=60?(Math.floor(s.mins/60)+'h'+(s.mins%60?(' '+(s.mins%60)+'m'):'')):s.mins+'m';
-      html+=`<div class="seg seg-study" style="min-height:${Math.max(54,Math.min(dur*0.7,150))}px">
+      const key=slotKey(viewDate,s.start);
+      const manual=(S.slotTasks||{})[key];
+      html+=`<div class="seg seg-study ${manual?'has-task':''}" style="min-height:${Math.max(54,Math.min(dur*0.7,150))}px" onclick="editSlot('${key}',${s.start},${s.mins})">
         <div class="seg-time">${m2t(s.start)}</div>
         <div class="seg-body">
-          <div class="seg-title">Free to study · ${lab}</div>
-          <div class="seg-note">Chapters fill in once your subjects &amp; tests are set</div>
+          <div class="seg-title">${manual?manual:'Free to study · '+lab}</div>
+          <div class="seg-note">${manual?'Tap to change · '+lab:'Tap to add what to study'}</div>
         </div></div>`;
     }else{
       html+=`<div class="seg seg-${s.type}">
@@ -720,6 +727,30 @@ function renderDayNav(){
   }).join('');
 }
 function pickDay(ts){viewDate=new Date(ts);renderTimeline();}
+
+/* ---- manual study-slot entry ---- */
+function slotKey(date,startMin){
+  const d=new Date(date); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'@'+startMin;
+}
+function editSlot(key,start,mins){
+  const cur=(S.slotTasks||{})[key]||'';
+  const v=prompt('What will you study in this '+(mins>=60?Math.floor(mins/60)+'h'+(mins%60?(' '+mins%60+'m'):''):mins+'m')+' slot?\n(Leave blank to clear)',cur);
+  if(v===null) return;
+  if(!S.slotTasks)S.slotTasks={};
+  if(v.trim())S.slotTasks[key]=v.trim(); else delete S.slotTasks[key];
+  save(); renderTimeline();
+}
+
+/* ---- bottom nav page switching ---- */
+function setPage(p){
+  document.querySelectorAll('#bottomNav .bn').forEach(b=>b.classList.toggle('on',b.dataset.p===p));
+  document.getElementById('page-home').style.display=p==='home'?'block':'none';
+  document.getElementById('page-setup').style.display=p==='setup'?'block':'none';
+  document.getElementById('appTitle').textContent=p==='home'?'Today':'Setup';
+  if(p==='home')renderTimeline();
+  if(p==='setup'){renderSyllabus();renderSchoolCard();renderRhythmCard();}
+  window.scrollTo(0,0);
+}
 
 /* ---- view switching ---- */
 let curView='day';
@@ -828,45 +859,18 @@ function renderMonth(){
 }
 
 /* ---- subjects & syllabus ---- */
-function renderSubjectsCard(){
-  const el=document.getElementById('subjectsCard'); if(!el)return;
-  const on=Object.entries(S.subjects).filter(([,v])=>v.on);
-  const names=on.map(([k])=>k).join(' · ')||'None yet';
-  el.innerHTML=`
-    <div class="sch-row">
-      <div class="sch-ic"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg></div>
-      <div class="sch-info">
-        <h3>${on.length} subject${on.length!==1?'s':''}</h3>
-        <p>${names}</p>
-      </div>
-      <button class="sch-edit" onclick="openSyllabus()">Edit</button>
-    </div>`;
-}
-
-function openSyllabus(){
-  document.getElementById('app').style.display='none';
-  const scr=document.getElementById('syllabusScreen');
-  scr.style.display='block';
-  renderSyllabus();
-  window.scrollTo(0,0);
-}
-function closeSyllabus(){
-  document.getElementById('syllabusScreen').style.display='none';
-  document.getElementById('app').style.display='block';
-  save(); renderSubjectsCard();
-}
+let openSubjects=new Set();
 function renderSyllabus(){
   const host=document.getElementById('syllabusBody');
-  // top: subject chips for quick on/off selection
   const chips=Object.keys(SYLLABUS).map(subj=>
     `<button class="subj-chip ${S.subjects[subj].on?'on':''}" onclick="toggleSubject('${subj.replace(/'/g,"\\'")}')">${subj}</button>`
   ).join('');
-  // below: only ON subjects get an expandable chapter list
   const onSubjects=Object.entries(S.subjects).filter(([,v])=>v.on);
   const lists=onSubjects.map(([subj,v])=>{
     const onCount=v.chaps.filter(c=>c.on).length;
-    return `<div class="subj">
-      <div class="subj-head" onclick="toggleSubjOpen(this)">
+    const isOpen=openSubjects.has(subj);
+    return `<div class="subj ${isOpen?'open':''}" data-subj="${subj}">
+      <div class="subj-head" onclick="toggleSubjOpen('${subj.replace(/'/g,"\\'")}')">
         <div class="subj-name">
           <h3>${subj}</h3>
           <p>${onCount} of ${v.chaps.length} chapters</p>
@@ -876,14 +880,15 @@ function renderSyllabus(){
       <div class="chap-wrap">
         ${v.chaps.map((c,ci)=>`
           <div class="chap ${c.on?'':'chap-off'}">
-            <button class="chap-check ${c.on?'on':''}" onclick="event.stopPropagation();toggleChap('${subj.replace(/'/g,"\\'")}',${ci})"></button>
+            <button class="chap-check ${c.on?'on':''}" onclick="toggleChap('${subj.replace(/'/g,"\\'")}',${ci})"></button>
             <span class="chap-name">${c.name}</span>
             <div class="wt-mini">
-              <button onclick="event.stopPropagation();bumpWt('${subj.replace(/'/g,"\\'")}',${ci},-1)">−</button>
-              <i class="wt-dot wt${c.wt}" title="weight"></i>
-              <button onclick="event.stopPropagation();bumpWt('${subj.replace(/'/g,"\\'")}',${ci},1)">+</button>
+              <button onclick="bumpWt('${subj.replace(/'/g,"\\'")}',${ci},-1)">−</button>
+              <i class="wt-dot wt${c.wt}"></i>
+              <button onclick="bumpWt('${subj.replace(/'/g,"\\'")}',${ci},1)">+</button>
             </div>
           </div>`).join('')}
+        <button class="add-chap" onclick="addChap('${subj.replace(/'/g,"\\'")}')">+ Add a chapter</button>
       </div>
     </div>`;
   }).join('');
@@ -893,10 +898,14 @@ function renderSyllabus(){
     <div class="section-label" style="margin:24px 2px 10px">Chapters ${onSubjects.length?'· tap a subject to trim':''}</div>
     ${lists||'<p style="color:var(--ink-faint);font-size:14px;padding:0 2px">Select subjects above to see their chapters.</p>'}`;
 }
-function toggleSubjOpen(headEl){ headEl.closest('.subj').classList.toggle('open'); }
+function toggleSubjOpen(subj){ if(openSubjects.has(subj))openSubjects.delete(subj);else openSubjects.add(subj); renderSyllabus(); }
 function toggleSubject(subj){ S.subjects[subj].on=!S.subjects[subj].on; save(); renderSyllabus(); }
-function toggleChap(subj,ci){ const c=S.subjects[subj].chaps[ci]; c.on=!c.on; save(); renderSyllabus(); }
+function toggleChap(subj,ci){ S.subjects[subj].chaps[ci].on=!S.subjects[subj].chaps[ci].on; save(); renderSyllabus(); }
 function bumpWt(subj,ci,d){ const c=S.subjects[subj].chaps[ci]; c.wt=Math.max(1,Math.min(3,c.wt+d)); save(); renderSyllabus(); }
+function addChap(subj){
+  const name=prompt('Chapter name');
+  if(name&&name.trim()){ S.subjects[subj].chaps.push({name:name.trim(),wt:2,on:true}); openSubjects.add(subj); save(); renderSyllabus(); }
+}
 
 /* ============================================================
    APP SHELL  — shows the saved foundation; rest comes next steps
@@ -913,7 +922,6 @@ function boot(){
     new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   renderSchoolCard();
   renderRhythmCard();
-  renderSubjectsCard();
   viewDate=new Date();
   renderTimeline();
 }
