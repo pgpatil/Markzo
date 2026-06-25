@@ -147,6 +147,80 @@
   .setup-fold summary{font-size:13.5px;font-weight:650;color:var(--ink-soft);padding:12px 2px;cursor:pointer;list-style:none;}
   .setup-fold summary::-webkit-details-marker{display:none;}
   .setup-fold summary::before{content:"⚙  ";}
+
+  /* view toggle */
+  .view-toggle{display:flex;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:4px;margin:6px 0 4px;}
+  .view-toggle button{flex:1;padding:9px;border-radius:10px;font-size:14px;font-weight:650;color:var(--ink-soft);}
+  .view-toggle button.on{background:var(--ink);color:#fff;}
+
+  /* week view */
+  .wk-head{display:flex;align-items:center;justify-content:space-between;margin:16px 0 12px;}
+  .wk-title{font-size:15px;font-weight:700;}
+  .wk-nav{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-size:18px;color:var(--ink-soft);}
+  .wk-grid{display:flex;gap:6px;}
+  .wk-col{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;
+    display:flex;flex-direction:column;align-items:center;gap:6px;min-height:150px;}
+  .wk-col.on{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink);}
+  .wk-cap{text-align:center;line-height:1.1;}
+  .wk-cap span{display:block;font-size:10px;font-weight:700;color:var(--ink-faint);text-transform:uppercase;}
+  .wk-cap b{font-size:15px;}
+  .wk-stack{display:flex;flex-direction:column;gap:3px;width:100%;align-items:center;flex:1;justify-content:flex-end;}
+  .wk-bar{width:70%;border-radius:3px;}
+  .wk-bar.wk-school{background:#cdc4ad;}
+  .wk-bar.wk-block{background:var(--test);}
+  .wk-bar.wk-study{background:var(--study);}
+  .wk-empty{height:8px;}
+  .wk-load{font-size:10.5px;font-weight:700;color:var(--study);}
+  .wk-legend{display:flex;gap:14px;justify-content:center;margin-top:14px;font-size:12px;color:var(--ink-soft);flex-wrap:wrap;}
+  .wk-legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:middle;}
+  .wk-legend i.wk-school{background:#cdc4ad;} .wk-legend i.wk-block{background:var(--test);} .wk-legend i.wk-study{background:var(--study);}
+
+  /* month view */
+  .mc-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:6px;}
+  .mc-dow span{text-align:center;font-size:11px;font-weight:700;color:var(--ink-faint);}
+  .mc-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;}
+  .mc{aspect-ratio:1;border:1px solid var(--line);border-radius:10px;background:var(--card);position:relative;
+    display:flex;align-items:flex-start;justify-content:flex-start;padding:5px 0 0 6px;}
+  .mc.empty{border:none;background:none;}
+  .mc-n{font-size:12.5px;font-weight:650;color:var(--ink-soft);}
+  .mc.today{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink);}
+  .mc.today .mc-n{color:var(--ink);font-weight:800;}
+  .mc-load{position:absolute;bottom:6px;left:6px;right:6px;height:4px;border-radius:2px;background:transparent;}
+  .mc-load.lvl1{background:#cfe6da;} .mc-load.lvl2{background:#8fc6ab;} .mc-load.lvl3{background:var(--study);}
+  .mc-school{position:absolute;top:6px;right:6px;width:5px;height:5px;border-radius:50%;background:#c9bfa6;}
+  .mc-dot{display:inline-block;width:10px;height:4px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  .mc-dot.lvl1{background:#cfe6da;} .mc-dot.lvl2{background:#8fc6ab;} .mc-dot.lvl3{background:var(--study);}
+  .mc-school-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#c9bfa6;margin-right:5px;vertical-align:middle;}
+
+  /* syllabus screen */
+  #syllabusScreen{display:none;min-height:100vh;background:var(--paper);}
+  .syl-top{position:sticky;top:0;background:var(--paper);border-bottom:1px solid var(--line);
+    padding:16px 20px calc(14px);display:flex;align-items:center;gap:14px;z-index:5;max-width:480px;margin:0 auto;}
+  .syl-back{font-size:15px;font-weight:700;color:var(--study);}
+  .syl-top h2{font-size:17px;}
+  .syl-intro{font-size:13.5px;color:var(--ink-soft);line-height:1.5;margin:18px 2px;}
+  .subj-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .subj-chip{font-size:13.5px;font-weight:600;padding:9px 14px;border-radius:22px;border:1px solid var(--line);background:var(--card);color:var(--ink-soft);}
+  .subj-chip.on{background:var(--study);border-color:var(--study);color:#fff;}
+  .subj{margin-bottom:10px;border:1px solid var(--line);border-radius:14px;background:var(--card);overflow:hidden;}
+  .subj-head{display:flex;align-items:center;gap:12px;padding:14px 15px;cursor:pointer;}
+  .subj-name{flex:1;}
+  .subj-name h3{font-size:15.5px;}
+  .subj-name p{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .subj .chev{width:20px;height:20px;stroke:var(--ink-faint);fill:none;stroke-width:2;transition:.2s;}
+  .subj.open .chev{transform:rotate(90deg);}
+  .chap-wrap{display:none;padding:2px 8px 8px;}
+  .subj.open .chap-wrap{display:block;}
+  .chap{display:flex;align-items:center;gap:11px;padding:9px 8px;border-top:1px solid var(--line);}
+  .chap-off{opacity:.45;}
+  .chap-check{width:22px;height:22px;border-radius:7px;border:2px solid var(--line);flex:none;background:var(--card);position:relative;}
+  .chap-check.on{background:var(--study);border-color:var(--study);}
+  .chap-check.on::after{content:"";position:absolute;left:6px;top:2px;width:5px;height:10px;border:solid #fff;border-width:0 2px 2px 0;transform:rotate(45deg);}
+  .chap-name{flex:1;font-size:13.5px;}
+  .wt-mini{display:flex;align-items:center;gap:7px;flex:none;}
+  .wt-mini button{width:24px;height:24px;border-radius:7px;border:1px solid var(--line);background:var(--card);font-size:14px;font-weight:700;color:var(--ink-faint);}
+  .wt-dot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .wt-dot.wt1{background:#cfe6da;} .wt-dot.wt2{background:#7bbd9d;} .wt-dot.wt3{background:var(--study);}
   .rt-block{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;font-size:14.5px;border-top:1px dashed var(--line);}
   .rt-block:first-child{border-top:none;}
   .rt-block .rt-time{font-size:13px;color:var(--ink-soft);white-space:nowrap;}
@@ -169,8 +243,18 @@
       <h1>Today</h1>
     </div>
 
-    <div id="dayNav" class="day-nav"></div>
-    <div class="timeline" id="timeline"></div>
+    <div class="view-toggle" id="viewToggle">
+      <button data-v="day" class="on" onclick="setView('day')">Day</button>
+      <button data-v="week" onclick="setView('week')">Week</button>
+      <button data-v="month" onclick="setView('month')">Month</button>
+    </div>
+
+    <div id="view-day">
+      <div id="dayNav" class="day-nav"></div>
+      <div class="timeline" id="timeline"></div>
+    </div>
+    <div id="view-week" style="display:none"></div>
+    <div id="view-month" style="display:none"></div>
 
     <details class="setup-fold">
       <summary>Your school &amp; daily routine</summary>
@@ -178,7 +262,21 @@
       <div class="card" id="schoolCard"></div>
       <div class="section-label">Your day</div>
       <div class="card" id="rhythmCard"></div>
+      <div class="section-label">Subjects &amp; syllabus</div>
+      <div class="card" id="subjectsCard"></div>
     </details>
+  </div>
+</div>
+
+<!-- ================= SYLLABUS SCREEN ================= -->
+<div id="syllabusScreen">
+  <div class="syl-top">
+    <button class="syl-back" onclick="closeSyllabus()">‹ Done</button>
+    <h2>Subjects &amp; syllabus</h2>
+  </div>
+  <div class="wrap">
+    <p class="syl-intro">Turn off subjects you don't take and chapters your school has left out. Tune each chapter's weight — heavier chapters get more study time. The plan uses all of this.</p>
+    <div id="syllabusBody"></div>
   </div>
 </div>
 
@@ -204,6 +302,23 @@
    school: one start/end pair + which days have school.
    (tuitions are day-before paste — built in a later step)
    ============================================================ */
+/* ICSE Class 10 syllabus seed — chapters with rough default weights
+   (1 light · 2 medium · 3 heavy). Structure is right; weights are a
+   starting point the student tunes. Subjects toggle on/off per school. */
+const SYLLABUS={
+  "English":[["Language — Composition",2],["Letter & Email",1],["Comprehension",2],["Drama (prescribed)",3],["Poetry (prescribed)",2],["Prose / Short stories",2]],
+  "Mathematics":[["GST & Banking",2],["Linear Inequations",1],["Quadratic Equations",3],["Ratio & Proportion",2],["Matrices",2],["Arithmetic & Geometric Progression",2],["Coordinate Geometry",3],["Reflection",1],["Similarity",2],["Circles",3],["Constructions",1],["Mensuration",3],["Trigonometry",3],["Heights & Distances",2],["Statistics",2],["Probability",1]],
+  "Physics":[["Force, Work, Power & Energy",3],["Machines",2],["Refraction at Plane Surfaces",2],["Refraction through Lens",3],["Spectrum",1],["Sound",2],["Current Electricity",3],["Electromagnetism",2],["Calorimetry",1],["Radioactivity",2]],
+  "Chemistry":[["Periodic Properties",2],["Chemical Bonding",3],["Acids, Bases & Salts",2],["Analytical Chemistry",2],["Mole Concept & Stoichiometry",3],["Electrolysis",3],["Metallurgy",2],["Study of Compounds — HCl",1],["Compounds — Ammonia",2],["Compounds — Nitric Acid",2],["Compounds — Sulphuric Acid",2],["Organic Chemistry",3]],
+  "Biology":[["Cell Cycle & Division",2],["Chromosomes",2],["Genetics",3],["Absorption by Roots",1],["Transpiration",2],["Photosynthesis",3],["Circulatory System",3],["Excretory System",2],["Nervous System",3],["Endocrine System",2],["Reproductive System",2],["Population",1],["Human Evolution",2],["Pollution",1]],
+  "History & Civics":[["The Union Legislature",2],["The Union Executive",2],["The Judiciary",2],["First War of Independence 1857",2],["Growth of Nationalism",2],["First Phase of National Movement",2],["Gandhi & National Movement",3],["Quit India & Independence",2],["The First World War",2],["Rise of Dictatorships",2],["The Second World War",2],["United Nations",1],["Non-Aligned Movement",1]],
+  "Geography":[["Topographical Maps",3],["Map of India",1],["Climate of India",2],["Soil Resources",2],["Natural Vegetation",1],["Water Resources",2],["Mineral & Energy Resources",2],["Agriculture",3],["Manufacturing Industries",2],["Transport",1],["Waste Management",1]],
+  "Hindi":[["गद्य (Prose)",2],["पद्य (Poetry)",2],["नाटक / एकांकी (Drama)",2],["निबंध (Composition)",2],["पत्र (Letter)",1],["अपठित गद्यांश",2],["व्याकरण (Grammar)",2]],
+  "Commercial Studies":[["Commercial Organisations",2],["Marketing & Sales",2],["Consumer Protection",1],["E-Commerce",1],["Productivity & Quality",2],["Human Resources",2],["Finance & Capital",3],["Communication",1],["Stakeholders",2],["Government & Business",2]],
+  "Physical Education":[["Effects of Exercise",2],["Sports Injuries & First Aid",2],["Diet & Nutrition",2],["Training & Coaching",2],["Game — Skills & Rules",2],["Yoga",1],["Test & Measurement",1],["Health Education",1]]
+};
+const CORE7=["English","Mathematics","Physics","Chemistry","Biology","History & Civics","Geography"];
+
 let S = load();
 function load(){try{return JSON.parse(localStorage.getItem('bt_state'))||null;}catch(e){return null;}}
 function save(){localStorage.setItem('bt_state',JSON.stringify(S));}
@@ -218,9 +333,19 @@ function fresh(){
     wake:{time:'06:30',days:['MO','TU','WE','TH','FR','SA','SU']},
     sleep:{time:'22:30',days:['MO','TU','WE','TH','FR','SA','SU']},
     blocks:[],   // {id,name,start,end,days:[...]}
+    subjects:initSubjects(),
     rhythmDone:false,
     setupDone:false
   };
+}
+// build subject state from seed: core 7 on, languages/electives off by default
+function initSubjects(){
+  const out={};
+  for(const [subj,chaps] of Object.entries(SYLLABUS)){
+    out[subj]={on:CORE7.includes(subj),
+      chaps:chaps.map(([name,wt])=>({name,wt,on:true}))};
+  }
+  return out;
 }
 
 /* ---- helpers ---- */
@@ -596,6 +721,183 @@ function renderDayNav(){
 }
 function pickDay(ts){viewDate=new Date(ts);renderTimeline();}
 
+/* ---- view switching ---- */
+let curView='day';
+function setView(v){
+  curView=v;
+  document.querySelectorAll('#viewToggle button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  document.getElementById('view-day').style.display=v==='day'?'block':'none';
+  document.getElementById('view-week').style.display=v==='week'?'block':'none';
+  document.getElementById('view-month').style.display=v==='month'?'block':'none';
+  if(v==='day')renderTimeline();
+  if(v==='week')renderWeek();
+  if(v==='month')renderMonth();
+}
+
+// total free-study minutes for a date
+function studyLoad(date){
+  return buildDay(date).filter(s=>s.type==='study').reduce((a,s)=>a+(s.mins||0),0);
+}
+
+/* ---- week view: 7 mini-columns ---- */
+let weekOffset=0; // weeks from current
+function renderWeek(){
+  const host=document.getElementById('view-week');
+  const base=new Date(); base.setHours(0,0,0,0);
+  base.setDate(base.getDate()-base.getDay()+1+weekOffset*7); // Monday start
+  const today=new Date(); today.setHours(0,0,0,0);
+  let cols='';
+  for(let i=0;i<7;i++){
+    const d=new Date(base); d.setDate(base.getDate()+i);
+    const segs=buildDay(d).filter(s=>s.type!=='sleep'&&s.type!=='tiny');
+    const isToday=d.getTime()===today.getTime();
+    const load=studyLoad(d);
+    const bars=segs.map(s=>{
+      const cls=s.type==='school'?'wk-school':s.type==='block'?'wk-block':'wk-study';
+      const h=Math.max(8,Math.min((s.end-s.start)*0.12,60));
+      return `<div class="wk-bar ${cls}" style="height:${h}px" title="${s.name}"></div>`;
+    }).join('');
+    cols+=`<button class="wk-col ${isToday?'on':''}" onclick="jumpTo(${d.getTime()})">
+      <div class="wk-cap"><span>${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</span><b>${d.getDate()}</b></div>
+      <div class="wk-stack">${bars||'<div class="wk-empty"></div>'}</div>
+      <div class="wk-load">${load>=60?(Math.floor(load/60)+'h'+(load%60?(load%60):'')):load+'m'}</div>
+    </button>`;
+  }
+  host.innerHTML=`
+    <div class="wk-head">
+      <button class="wk-nav" onclick="weekOffset--;renderWeek()">‹</button>
+      <div class="wk-title">${monthRange(base)}</div>
+      <button class="wk-nav" onclick="weekOffset++;renderWeek()">›</button>
+    </div>
+    <div class="wk-grid">${cols}</div>
+    <div class="wk-legend">
+      <span><i class="wk-school"></i>School</span>
+      <span><i class="wk-block"></i>Fixed</span>
+      <span><i class="wk-study"></i>Study</span>
+    </div>`;
+}
+function monthRange(monday){
+  const sun=new Date(monday);sun.setDate(monday.getDate()+6);
+  const M=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if(monday.getMonth()===sun.getMonth()) return M[monday.getMonth()]+' '+monday.getDate()+'–'+sun.getDate();
+  return M[monday.getMonth()]+' '+monday.getDate()+' – '+M[sun.getMonth()]+' '+sun.getDate();
+}
+function jumpTo(ts){viewDate=new Date(ts);setView('day');
+  document.querySelector('#viewToggle button[data-v="day"]').classList.add('on');}
+
+/* ---- month view: calendar grid ---- */
+let monthOffset=0;
+function renderMonth(){
+  const host=document.getElementById('view-month');
+  const base=new Date(); base.setDate(1); base.setHours(0,0,0,0);
+  base.setMonth(base.getMonth()+monthOffset);
+  const y=base.getFullYear(), m=base.getMonth();
+  const M=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const firstDow=(new Date(y,m,1).getDay()+6)%7; // Monday=0
+  const days=new Date(y,m+1,0).getDate();
+  const today=new Date(); today.setHours(0,0,0,0);
+  let cells='';
+  for(let i=0;i<firstDow;i++) cells+='<div class="mc empty"></div>';
+  for(let dd=1;dd<=days;dd++){
+    const d=new Date(y,m,dd);
+    const dk=DOW[d.getDay()];
+    const hasSchool=buildDay(d).some(s=>s.type==='school');
+    const load=studyLoad(d);
+    const lvl=load===0?0:load<120?1:load<300?2:3;
+    const isToday=d.getTime()===today.getTime();
+    cells+=`<button class="mc ${isToday?'today':''}" onclick="jumpTo(${d.getTime()})">
+      <span class="mc-n">${dd}</span>
+      <span class="mc-load lvl${lvl}"></span>
+      ${hasSchool?'<span class="mc-school"></span>':''}
+    </button>`;
+  }
+  host.innerHTML=`
+    <div class="wk-head">
+      <button class="wk-nav" onclick="monthOffset--;renderMonth()">‹</button>
+      <div class="wk-title">${M[m]} ${y}</div>
+      <button class="wk-nav" onclick="monthOffset++;renderMonth()">›</button>
+    </div>
+    <div class="mc-dow">${['M','T','W','T','F','S','S'].map(x=>`<span>${x}</span>`).join('')}</div>
+    <div class="mc-grid">${cells}</div>
+    <div class="wk-legend">
+      <span><i class="mc-dot lvl1"></i>Light</span>
+      <span><i class="mc-dot lvl2"></i>Medium</span>
+      <span><i class="mc-dot lvl3"></i>Full</span>
+      <span><i class="mc-school-dot"></i>School</span>
+    </div>`;
+}
+
+/* ---- subjects & syllabus ---- */
+function renderSubjectsCard(){
+  const el=document.getElementById('subjectsCard'); if(!el)return;
+  const on=Object.entries(S.subjects).filter(([,v])=>v.on);
+  const names=on.map(([k])=>k).join(' · ')||'None yet';
+  el.innerHTML=`
+    <div class="sch-row">
+      <div class="sch-ic"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"/></svg></div>
+      <div class="sch-info">
+        <h3>${on.length} subject${on.length!==1?'s':''}</h3>
+        <p>${names}</p>
+      </div>
+      <button class="sch-edit" onclick="openSyllabus()">Edit</button>
+    </div>`;
+}
+
+function openSyllabus(){
+  document.getElementById('app').style.display='none';
+  const scr=document.getElementById('syllabusScreen');
+  scr.style.display='block';
+  renderSyllabus();
+  window.scrollTo(0,0);
+}
+function closeSyllabus(){
+  document.getElementById('syllabusScreen').style.display='none';
+  document.getElementById('app').style.display='block';
+  save(); renderSubjectsCard();
+}
+function renderSyllabus(){
+  const host=document.getElementById('syllabusBody');
+  // top: subject chips for quick on/off selection
+  const chips=Object.keys(SYLLABUS).map(subj=>
+    `<button class="subj-chip ${S.subjects[subj].on?'on':''}" onclick="toggleSubject('${subj.replace(/'/g,"\\'")}')">${subj}</button>`
+  ).join('');
+  // below: only ON subjects get an expandable chapter list
+  const onSubjects=Object.entries(S.subjects).filter(([,v])=>v.on);
+  const lists=onSubjects.map(([subj,v])=>{
+    const onCount=v.chaps.filter(c=>c.on).length;
+    return `<div class="subj">
+      <div class="subj-head" onclick="toggleSubjOpen(this)">
+        <div class="subj-name">
+          <h3>${subj}</h3>
+          <p>${onCount} of ${v.chaps.length} chapters</p>
+        </div>
+        <svg class="chev" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
+      </div>
+      <div class="chap-wrap">
+        ${v.chaps.map((c,ci)=>`
+          <div class="chap ${c.on?'':'chap-off'}">
+            <button class="chap-check ${c.on?'on':''}" onclick="event.stopPropagation();toggleChap('${subj.replace(/'/g,"\\'")}',${ci})"></button>
+            <span class="chap-name">${c.name}</span>
+            <div class="wt-mini">
+              <button onclick="event.stopPropagation();bumpWt('${subj.replace(/'/g,"\\'")}',${ci},-1)">−</button>
+              <i class="wt-dot wt${c.wt}" title="weight"></i>
+              <button onclick="event.stopPropagation();bumpWt('${subj.replace(/'/g,"\\'")}',${ci},1)">+</button>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  }).join('');
+  host.innerHTML=`
+    <div class="section-label" style="margin:6px 2px 10px">Tap the subjects you take</div>
+    <div class="subj-chips">${chips}</div>
+    <div class="section-label" style="margin:24px 2px 10px">Chapters ${onSubjects.length?'· tap a subject to trim':''}</div>
+    ${lists||'<p style="color:var(--ink-faint);font-size:14px;padding:0 2px">Select subjects above to see their chapters.</p>'}`;
+}
+function toggleSubjOpen(headEl){ headEl.closest('.subj').classList.toggle('open'); }
+function toggleSubject(subj){ S.subjects[subj].on=!S.subjects[subj].on; save(); renderSyllabus(); }
+function toggleChap(subj,ci){ const c=S.subjects[subj].chaps[ci]; c.on=!c.on; save(); renderSyllabus(); }
+function bumpWt(subj,ci,d){ const c=S.subjects[subj].chaps[ci]; c.wt=Math.max(1,Math.min(3,c.wt+d)); save(); renderSyllabus(); }
+
 /* ============================================================
    APP SHELL  — shows the saved foundation; rest comes next steps
    ============================================================ */
@@ -603,13 +905,15 @@ function boot(){
   // backfill rhythm fields for state saved before this step existed
   if(S){ if(!S.wake)S.wake={time:'06:30',days:[...ALLDAYS]};
     if(!S.sleep)S.sleep={time:'22:30',days:[...ALLDAYS]};
-    if(!S.blocks)S.blocks=[]; }
+    if(!S.blocks)S.blocks=[];
+    if(!S.subjects)S.subjects=initSubjects(); }
   document.getElementById('onb').style.display='none';
   document.getElementById('app').style.display='block';
   document.getElementById('topDate').textContent=
     new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   renderSchoolCard();
   renderRhythmCard();
+  renderSubjectsCard();
   viewDate=new Date();
   renderTimeline();
 }
