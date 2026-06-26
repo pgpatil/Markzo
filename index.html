@@ -35,7 +35,7 @@
   .wrap{max-width:480px;margin:0 auto;padding:0 20px;}
 
   /* ---- onboarding ---- */
-  #onb{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;z-index:10;}
+  #onb{position:fixed;inset:0;background:var(--paper);display:flex;flex-direction:column;z-index:50;}
   .onb-top{padding:22px 20px 0;max-width:480px;margin:0 auto;width:100%;}
   .steps{display:flex;gap:6px;}
   .steps i{flex:1;height:4px;border-radius:2px;background:var(--line);transition:.3s;}
@@ -141,6 +141,10 @@
   .seg-sleep .seg-title{color:var(--ink-soft);font-weight:600;}
   .seg-study{background:var(--study-soft);border-color:#cfe6da;border-style:solid;}
   .seg-study .seg-title{color:var(--study);}
+  .paste-btn{width:100%;padding:12px;border:1px dashed var(--study);border-radius:13px;background:var(--study-soft);
+    color:var(--study);font-weight:650;font-size:14px;margin-bottom:14px;}
+  .seg-tuition-maybe{background:repeating-linear-gradient(45deg,var(--test-soft),var(--test-soft) 8px,#fff5e9 8px,#fff5e9 16px);border-color:#eed9bd;border-style:dashed;}
+  .seg-tuition-maybe .seg-title{color:var(--test);}
   .seg-study.has-task{background:#fff;border-color:var(--study);border-left:4px solid var(--study);}
   .seg-study.has-task .seg-title{color:var(--ink);font-weight:680;}
 
@@ -221,7 +225,7 @@
   .add-chap{margin:8px 8px 4px;font-size:13px;font-weight:650;color:var(--study);padding:8px 0;}
 
   /* bottom nav */
-  #bottomNav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:flex;justify-content:center;gap:8px;
+  #bottomNav{position:fixed;bottom:0;left:0;right:0;z-index:30;display:none;justify-content:center;gap:8px;
     background:rgba(245,241,232,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line);
     padding:8px 0 calc(8px + env(safe-area-inset-bottom));}
   .bn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 26px;border-radius:12px;color:var(--ink-faint);}
@@ -259,6 +263,7 @@
       </div>
       <div id="view-day">
         <div id="dayNav" class="day-nav"></div>
+        <button class="paste-btn" onclick="openPaste()">＋ Paste tuition schedule</button>
         <div class="timeline" id="timeline"></div>
       </div>
       <div id="view-week" style="display:none"></div>
@@ -301,6 +306,19 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- tuition paste sheet -->
+<div class="sheet-bg" id="pasteBg">
+  <div class="sheet" style="max-height:88vh;overflow-y:auto">
+    <h2 id="pasteTitle">Paste tuition schedule</h2>
+    <div class="sub">Copy the whole WhatsApp message from your tuition and paste it here. We'll read the date and timings for you to confirm.</div>
+    <textarea id="pasteInput" placeholder="Paste the lecture schedule message…" rows="7"
+      style="width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;font-size:14px;font-family:inherit;background:var(--paper-2);resize:vertical;line-height:1.5"></textarea>
+    <button class="btn" style="margin-top:12px" onclick="parsePaste()">Read it</button>
+    <div id="pasteResult"></div>
+    <button class="btn link" onclick="closePaste()">Cancel</button>
+  </div>
+</div>
+
 <script>
 /* ============================================================
    STATE  — the locked foundation starts here.
@@ -311,18 +329,27 @@
    (1 light · 2 medium · 3 heavy). Structure is right; weights are a
    starting point the student tunes. Subjects toggle on/off per school. */
 const SYLLABUS={
-  "English":[["Language — Composition",2],["Letter & Email",1],["Comprehension",2],["Drama (prescribed)",3],["Poetry (prescribed)",2],["Prose / Short stories",2]],
+  "English Language":[["Composition",2],["Letter & Email",1],["Notice & Memo",1],["Comprehension",2],["Grammar",2]],
+  "Literature in English":[["Drama (prescribed)",3],["Poetry (prescribed)",2],["Prose / Short stories",2]],
   "Mathematics":[["GST & Banking",2],["Linear Inequations",1],["Quadratic Equations",3],["Ratio & Proportion",2],["Matrices",2],["Arithmetic & Geometric Progression",2],["Coordinate Geometry",3],["Reflection",1],["Similarity",2],["Circles",3],["Constructions",1],["Mensuration",3],["Trigonometry",3],["Heights & Distances",2],["Statistics",2],["Probability",1]],
-  "Physics":[["Force, Work, Power & Energy",3],["Machines",2],["Refraction at Plane Surfaces",2],["Refraction through Lens",3],["Spectrum",1],["Sound",2],["Current Electricity",3],["Electromagnetism",2],["Calorimetry",1],["Radioactivity",2]],
+  "Physics":[["Force, Work, Power & Energy",3],["Machines",2],["Refraction at Plane Surfaces",2],["Refraction through Lens",3],["Spectrum",1],["Sound",2],["Current Electricity",3],["Household Circuits",2],["Electromagnetism",2],["Calorimetry",1],["Radioactivity",2]],
   "Chemistry":[["Periodic Properties",2],["Chemical Bonding",3],["Acids, Bases & Salts",2],["Analytical Chemistry",2],["Mole Concept & Stoichiometry",3],["Electrolysis",3],["Metallurgy",2],["Study of Compounds — HCl",1],["Compounds — Ammonia",2],["Compounds — Nitric Acid",2],["Compounds — Sulphuric Acid",2],["Organic Chemistry",3]],
-  "Biology":[["Cell Cycle & Division",2],["Chromosomes",2],["Genetics",3],["Absorption by Roots",1],["Transpiration",2],["Photosynthesis",3],["Circulatory System",3],["Excretory System",2],["Nervous System",3],["Endocrine System",2],["Reproductive System",2],["Population",1],["Human Evolution",2],["Pollution",1]],
+  "Biology":[["Cell — Structure & Function",2],["Chromosomes & Cell Division",2],["Genetics",3],["Absorption by Roots",1],["Transpiration",2],["Photosynthesis",3],["Circulatory System",3],["Excretory System",2],["Nervous System",3],["Endocrine System",2],["Reproductive System",2],["Population",1],["Human Evolution",2],["Pollution",1]],
   "History & Civics":[["The Union Legislature",2],["The Union Executive",2],["The Judiciary",2],["First War of Independence 1857",2],["Growth of Nationalism",2],["First Phase of National Movement",2],["Gandhi & National Movement",3],["Quit India & Independence",2],["The First World War",2],["Rise of Dictatorships",2],["The Second World War",2],["United Nations",1],["Non-Aligned Movement",1]],
   "Geography":[["Topographical Maps",3],["Map of India",1],["Climate of India",2],["Soil Resources",2],["Natural Vegetation",1],["Water Resources",2],["Mineral & Energy Resources",2],["Agriculture",3],["Manufacturing Industries",2],["Transport",1],["Waste Management",1]],
   "Hindi":[["गद्य (Prose)",2],["पद्य (Poetry)",2],["नाटक / एकांकी (Drama)",2],["निबंध (Composition)",2],["पत्र (Letter)",1],["अपठित गद्यांश",2],["व्याकरण (Grammar)",2]],
+  "Economics":[["Productive Mechanism",2],["Banking & Money",2],["Public Finance",2],["Inflation",2],["Demand & Supply",3],["Globalisation",1],["Consumer Awareness",1]],
   "Commercial Studies":[["Commercial Organisations",2],["Marketing & Sales",2],["Consumer Protection",1],["E-Commerce",1],["Productivity & Quality",2],["Human Resources",2],["Finance & Capital",3],["Communication",1],["Stakeholders",2],["Government & Business",2]],
-  "Physical Education":[["Effects of Exercise",2],["Sports Injuries & First Aid",2],["Diet & Nutrition",2],["Training & Coaching",2],["Game — Skills & Rules",2],["Yoga",1],["Test & Measurement",1],["Health Education",1]]
+  "Computer Applications":[["Class as Object Factory",2],["Constructors",2],["User-Defined Methods",2],["Encapsulation",1],["Library Classes",2],["Wrapper Classes",2],["Arrays",3],["String Handling",3],["Iteration / Loops",2]],
+  "Economic Applications":[["Basic Economic Problems",2],["Development",2],["Money & Banking",2],["Globalisation",1],["Sustainable Development",2]],
+  "Commercial Applications":[["Marketing",2],["Advertising & Sales Promotion",2],["Consumer Protection",1],["Banking",2],["Insurance",2],["Public Relations",1]],
+  "Environmental Science":[["Ecosystems",2],["Natural Resources",2],["Pollution & Hazards",2],["Conservation",2],["Sustainable Development",2]],
+  "Home Science":[["Food & Nutrition",2],["Cookery",1],["Textiles & Clothing",2],["Resource Management",2],["Child Care",2]],
+  "Physical Education":[["Effects of Exercise",2],["Sports Injuries & First Aid",2],["Diet & Nutrition",2],["Training & Coaching",2],["Game — Skills & Rules",2],["Yoga",1],["Test & Measurement",1],["Health Education",1]],
+  "Art":[["Still Life",2],["Nature Drawing",2],["Original Composition",3],["Applied Art / Design",2]],
+  "Marathi":[["गद्य (Prose)",2],["पद्य (Poetry)",2],["स्थूलवाचन",1],["व्याकरण (Grammar)",2],["रचना (Composition)",2]]
 };
-const CORE7=["English","Mathematics","Physics","Chemistry","Biology","History & Civics","Geography"];
+const CORE7=["English Language","Literature in English","Mathematics","Physics","Chemistry","Biology","History & Civics","Geography"];
 
 let S = load();
 function load(){try{return JSON.parse(localStorage.getItem('bt_state'))||null;}catch(e){return null;}}
@@ -390,10 +417,10 @@ const STEPS=[
 
       <div class="upload-zone" onclick="document.getElementById('schoolFile').click()">
         <svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L8 8m4-4l4 4"/><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/></svg>
-        <p>Upload timetable photo or PDF</p>
-        <div class="hint">We only read the start and end time</div>
+        <p>Upload a photo of your timetable</p>
+        <div class="hint">A clear photo works best · we only read start &amp; end time</div>
       </div>
-      <input type="file" id="schoolFile" accept="image/*,application/pdf" style="display:none" onchange="readSchool(event)">
+      <input type="file" id="schoolFile" accept="image/*" style="display:none" onchange="readSchool(event)">
       <div class="prog" id="schProg" style="display:none"><i id="schBar"></i></div>
       <div id="schStatus" class="field-note" style="display:none"></div>
 
@@ -557,6 +584,17 @@ async function readSchool(ev){
   const f=ev.target.files[0]; if(!f) return; ev.target.value='';
   const prog=document.getElementById('schProg'), bar=document.getElementById('schBar'),
         st=document.getElementById('schStatus');
+  // PDFs can't be read by on-device OCR — ask for a photo
+  if(f.type==='application/pdf' || /\.pdf$/i.test(f.name)){
+    st.style.display='block';
+    st.textContent="PDFs can't be read here. Take a photo of the timetable instead, or set the times by hand below.";
+    return;
+  }
+  if(typeof Tesseract==='undefined'){
+    st.style.display='block';
+    st.textContent='The reader is still loading or was blocked by your connection. Wait a moment and try again, or set the times by hand below.';
+    return;
+  }
   prog.style.display='block'; st.style.display='block';
   st.textContent='Reading your timetable on your device…'; bar.style.width='8%';
   let text='';
@@ -564,7 +602,7 @@ async function readSchool(ev){
     const res=await Tesseract.recognize(f,'eng',{logger:m=>{
       if(m.status==='recognizing text') bar.style.width=Math.round(8+m.progress*88)+'%';}});
     text=res.data.text||'';
-  }catch(e){ prog.style.display='none'; st.textContent='Could not read that one. Try a clearer photo, or set the times by hand below.'; return; }
+  }catch(e){ prog.style.display='none'; st.textContent='Could not read that image. Try a clearer, straight-on photo, or set the times by hand below.'; return; }
   prog.style.display='none'; st.style.display='none';
   const times=extractTimes(text);
   openReview(times);
@@ -629,6 +667,104 @@ function finishSetup(){
 }
 
 /* ============================================================
+   TUITION PASTE  — parse WGT-style lecture schedule messages
+   Sets exact blocks for the message date; seeds a weekly pattern.
+   ============================================================ */
+function openPaste(){ document.getElementById('pasteInput').value=''; document.getElementById('pasteResult').innerHTML='';
+  document.getElementById('pasteBg').classList.add('show'); }
+function closePaste(){ document.getElementById('pasteBg').classList.remove('show'); }
+
+let pasteParsed=null;
+function parsePaste(){
+  const raw=document.getElementById('pasteInput').value;
+  if(!raw.trim()){toast('Paste the message first');return;}
+  const res=readTuitionMsg(raw);
+  const box=document.getElementById('pasteResult');
+  if(!res || !res.slots.length){
+    box.innerHTML=`<p style="font-size:13.5px;color:var(--ink-soft);margin:14px 0 0">Couldn't read any timings. Check it's the full message with times like "06:30 pm to 07:35 pm".</p>`;
+    return;
+  }
+  pasteParsed=res;
+  const dlabel=res.date?res.date.toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'}):'date not found — pick below';
+  box.innerHTML=`
+    <div class="section-label" style="margin:18px 2px 8px">Found ${res.slots.length} class${res.slots.length>1?'es':''} · ${dlabel}</div>
+    ${!res.date?`<input type="date" id="pasteDate" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--paper-2)">`:''}
+    ${res.slots.map((s,i)=>`
+      <div class="card" style="padding:11px 13px;margin-bottom:8px;display:flex;gap:10px;align-items:center">
+        <input value="${s.subject}" onchange="pasteParsed.slots[${i}].subject=this.value"
+          style="flex:1;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--paper-2);font-size:14px">
+        <span style="font-size:13px;color:var(--ink-soft);white-space:nowrap">${m2t(s.start)}–${m2t(s.end)}</span>
+      </div>`).join('')}
+    <label style="display:flex;align-items:center;gap:9px;margin:12px 2px;font-size:13.5px;color:var(--ink-soft)">
+      <input type="checkbox" id="pasteWeekly" checked style="width:18px;height:18px"> Use this as the usual pattern for ${res.date?['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][res.date.getDay()]:'this weekday'}
+    </label>
+    <button class="btn" onclick="commitPaste()">Add to my day</button>`;
+}
+
+function readTuitionMsg(raw){
+  const text=raw.replace(/\*/g,'');
+  const lines=text.split('\n').map(l=>l.trim());
+  // date: look for dd-mm-yyyy or dd/mm/yyyy
+  let date=null;
+  const dm=text.match(/(\d{1,2})\s*[-\/.]\s*(\d{1,2})\s*[-\/.]\s*(\d{2,4})/);
+  if(dm){let d=+dm[1],mo=+dm[2]-1,y=+dm[3];if(y<100)y+=2000;
+    const dt=new Date(y,mo,d); if(!isNaN(dt))date=dt;}
+  // time-subject slots: a line with "06:30 pm to 07:35 pm" then subject on next non-empty line(s)
+  const slots=[];
+  const timeRe=/(\d{1,2})[:.](\d{2})\s*([ap]\.?m)?\s*(?:to|–|-)\s*(\d{1,2})[:.](\d{2})\s*([ap]\.?m)?/i;
+  for(let i=0;i<lines.length;i++){
+    const m=lines[i].match(timeRe);
+    if(!m) continue;
+    let sh=+m[1],sm=+m[2],sap=(m[3]||'').toLowerCase().replace(/\./g,'');
+    let eh=+m[4],em=+m[5],eap=(m[6]||'').toLowerCase().replace(/\./g,'');
+    // infer pm if missing and looks like evening tuition
+    if(sap==='pm'&&sh<12)sh+=12; if(sap==='am'&&sh===12)sh=0;
+    if(eap==='pm'&&eh<12)eh+=12; if(eap==='am'&&eh===12)eh=0;
+    if(!sap&&sh<12&&sh>=1&&sh<=11)sh+=12; // default evening
+    if(!eap&&eh<12&&eh>=1&&eh<=11)eh+=12;
+    const start=sh*60+sm, end=eh*60+em;
+    // subject: next non-empty line that isn't a time/header
+    let subject='';
+    for(let j=i+1;j<lines.length;j++){
+      const l=lines[j];
+      if(!l) continue;
+      if(timeRe.test(l)) break;
+      if(/room|reporting|regards|wgt|lecture|schedule|^date|^day|^[A-Z]-/i.test(l)) continue;
+      subject=l; break;
+    }
+    if(start<end) slots.push({start,end,subject:subject||'Tuition'});
+  }
+  // merge consecutive same-subject slots
+  const merged=[];
+  for(const s of slots){
+    const last=merged[merged.length-1];
+    if(last && last.subject===s.subject && Math.abs(last.end-s.start)<=5) last.end=s.end;
+    else merged.push({...s});
+  }
+  return {date,slots:merged};
+}
+
+function commitPaste(){
+  if(!pasteParsed) return;
+  let date=pasteParsed.date;
+  if(!date){ const v=document.getElementById('pasteDate'); if(v&&v.value){const [y,mo,d]=v.value.split('-').map(Number);date=new Date(y,mo-1,d);} }
+  if(!date){toast('Pick the date');return;}
+  const weekly=document.getElementById('pasteWeekly')?.checked;
+  const dateKey=date.getFullYear()+'-'+(date.getMonth()+1)+'-'+date.getDate();
+  if(!S.tuition)S.tuition={byDate:{},pattern:{}};
+  // exact blocks for this date
+  S.tuition.byDate[dateKey]=pasteParsed.slots.map(s=>({name:s.subject,start:s.start,end:s.end}));
+  // weekly tentative pattern for that weekday
+  if(weekly){ S.tuition.pattern[date.getDay()]=pasteParsed.slots.map(s=>({name:s.subject,start:s.start,end:s.end})); }
+  save();
+  closePaste();
+  viewDate=new Date(date);
+  setView('day');
+  renderTimeline();
+  toast('Tuition added for '+date.toLocaleDateString('en-IN',{day:'numeric',month:'short'}));
+}
+
+/* ============================================================
    TIMELINE  — builds the day from fixed layers, study fills gaps
    Window 5:00 (300) to 24:00 (1440). Min study gap 30 min.
    ============================================================ */
@@ -655,6 +791,16 @@ function fixedFor(date){
     // Saturday blocks may be limited to specific weeks of the month
     if(dk==='SA' && b.satWeeks && !b.satWeeks.includes(weekOfMonth(date))) continue;
     out.push({name:b.name,start:hm2m(b.start),end:hm2m(b.end),kind:'block'});
+  }
+  // tuition: exact blocks for this date, else tentative from weekday pattern
+  const tkey=date.getFullYear()+'-'+(date.getMonth()+1)+'-'+date.getDate();
+  if(S.tuition){
+    const exact=S.tuition.byDate&&S.tuition.byDate[tkey];
+    if(exact){
+      for(const t of exact) out.push({name:t.name,start:t.start,end:t.end,kind:'block'});
+    }else if(S.tuition.pattern&&S.tuition.pattern[date.getDay()]){
+      for(const t of S.tuition.pattern[date.getDay()]) out.push({name:t.name+' (expected)',start:t.start,end:t.end,kind:'tuition-maybe'});
+    }
   }
   return out.sort((a,b)=>a.start-b.start);
 }
@@ -915,9 +1061,14 @@ function boot(){
   if(S){ if(!S.wake)S.wake={time:'06:30',days:[...ALLDAYS]};
     if(!S.sleep)S.sleep={time:'22:30',days:[...ALLDAYS]};
     if(!S.blocks)S.blocks=[];
-    if(!S.subjects)S.subjects=initSubjects(); }
+    if(!S.subjects)S.subjects=initSubjects();
+    else { // add any newly-recognised subjects without touching existing ones
+      const seeded=initSubjects();
+      for(const k of Object.keys(seeded)) if(!S.subjects[k]) S.subjects[k]=seeded[k];
+    } }
   document.getElementById('onb').style.display='none';
   document.getElementById('app').style.display='block';
+  document.getElementById('bottomNav').style.display='flex';
   document.getElementById('topDate').textContent=
     new Date().toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long'});
   renderSchoolCard();
@@ -982,6 +1133,7 @@ function seedDraftsFromState(){
 function openOnbAt(step){
   onbStep=step;
   document.getElementById('app').style.display='none';
+  document.getElementById('bottomNav').style.display='none';
   document.getElementById('onb').style.display='flex';
   renderOnb();
 }
