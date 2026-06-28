@@ -69,10 +69,21 @@ let dataUrl=null;
 function onFile(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
-  r.onload=()=>{ dataUrl=r.result;
-    const p=document.getElementById('preview'); p.src=dataUrl; p.style.display='block';
-    document.getElementById('readBtn').style.display='block';
-    document.getElementById('out').innerHTML='';
+  r.onload=()=>{
+    // shrink large photos so the model reads faster (max 1600px wide)
+    const img=new Image();
+    img.onload=()=>{
+      const maxW=1600;
+      let w=img.width, h=img.height;
+      if(w>maxW){ h=Math.round(h*maxW/w); w=maxW; }
+      const c=document.createElement('canvas'); c.width=w; c.height=h;
+      c.getContext('2d').drawImage(img,0,0,w,h);
+      dataUrl=c.toDataURL('image/jpeg',0.85);
+      const p=document.getElementById('preview'); p.src=dataUrl; p.style.display='block';
+      document.getElementById('readBtn').style.display='block';
+      document.getElementById('out').innerHTML='';
+    };
+    img.src=r.result;
   };
   r.readAsDataURL(f);
 }
