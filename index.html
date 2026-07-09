@@ -385,6 +385,8 @@ function t12(t){ if(!t) return '—'; let [h,m]=t.split(':').map(Number);
   const ap=h>=12?'pm':'am'; h=h%12||12; return h+(m?':'+String(m).padStart(2,'0'):'')+ap; }
 function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');
   clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),1900);}
+// escape user-supplied text before it's dropped into innerHTML/attributes
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 /* ============================================================
    ONBOARDING  — step 1 is school hours (upload or by hand)
@@ -423,6 +425,7 @@ const STEPS=[
       <input type="file" id="schoolFile" accept="image/*" style="display:none" onchange="readSchool(event)">
       <div class="prog" id="schProg" style="display:none"><i id="schBar"></i></div>
       <div id="schStatus" class="field-note" style="display:none"></div>
+      <div class="field-note"><a href="timetable.html" target="_blank" rel="noopener" style="color:var(--study);font-weight:650">Try the AI timetable reader instead (beta) →</a></div>
 
       <div class="or">or set by hand</div>
 
@@ -511,7 +514,7 @@ function renderBlockDrafts(){
   return rdraft.blocks.map(b=>`
     <div class="block-draft" data-id="${b.id}">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-        <input type="text" placeholder="Name (e.g. Lunch)" value="${b.name||''}"
+        <input type="text" placeholder="Name (e.g. Lunch)" value="${esc(b.name||'')}"
           oninput="setBlock(${b.id},'name',this.value)"
           style="flex:1;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--card);font-size:15px">
         <button onclick="removeBlock(${b.id})" style="color:#c0392b;font-weight:700;font-size:13px;padding:8px">Remove</button>
@@ -648,6 +651,7 @@ function acceptReview(){
 }
 
 function finishSetup(){
+  if(hm2m(rdraft.wake.time)>=hm2m(rdraft.sleep.time)){toast('Sleep time should be after wake time');return;}
   // validate blocks
   for(const b of rdraft.blocks){
     if(!b.name.trim()){toast('Name each block, or remove it');return;}
@@ -691,7 +695,7 @@ function parsePaste(){
     ${!res.date?`<input type="date" id="pasteDate" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--paper-2)">`:''}
     ${res.slots.map((s,i)=>`
       <div class="card" style="padding:11px 13px;margin-bottom:8px;display:flex;gap:10px;align-items:center">
-        <input value="${s.subject}" onchange="pasteParsed.slots[${i}].subject=this.value"
+        <input value="${esc(s.subject)}" onchange="pasteParsed.slots[${i}].subject=this.value"
           style="flex:1;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--paper-2);font-size:14px">
         <span style="font-size:13px;color:var(--ink-soft);white-space:nowrap">${m2t(s.start)}–${m2t(s.end)}</span>
       </div>`).join('')}
@@ -807,10 +811,11 @@ function fixedFor(date){
 
 function buildDay(date){
   const wake=hm2m(S.wake.time), sleep=hm2m(S.sleep.time);
+  const dayStart=Math.min(DAY_START,wake); // don't clip a wake time earlier than the default window
   let fixed=fixedFor(date).filter(f=>f.end>f.start);
   const segs=[];
-  if(wake>DAY_START) segs.push({type:'sleep',start:DAY_START,end:wake,name:'Asleep'});
-  let cursor=Math.max(wake,DAY_START);
+  if(wake>dayStart) segs.push({type:'sleep',start:dayStart,end:wake,name:'Asleep'});
+  let cursor=Math.max(wake,dayStart);
   for(const f of fixed){
     const s=Math.max(f.start,cursor), e=f.end;
     if(s>cursor) addGap(segs,cursor,s);
@@ -840,14 +845,14 @@ function renderTimeline(){
       html+=`<div class="seg seg-study ${manual?'has-task':''}" style="min-height:${Math.max(54,Math.min(dur*0.7,150))}px" onclick="editSlot('${key}',${s.start},${s.mins})">
         <div class="seg-time">${m2t(s.start)}</div>
         <div class="seg-body">
-          <div class="seg-title">${manual?manual:'Free to study · '+lab}</div>
+          <div class="seg-title">${manual?esc(manual):'Free to study · '+lab}</div>
           <div class="seg-note">${manual?'Tap to change · '+lab:'Tap to add what to study'}</div>
         </div></div>`;
     }else{
       html+=`<div class="seg seg-${s.type}">
         <div class="seg-time">${m2t(s.start)}</div>
         <div class="seg-body">
-          <div class="seg-title">${s.name}</div>
+          <div class="seg-title">${esc(s.name)}</div>
           <div class="seg-note">${m2t(s.start)} – ${m2t(s.end)}</div>
         </div></div>`;
     }
@@ -932,7 +937,7 @@ function renderWeek(){
     const bars=segs.map(s=>{
       const cls=s.type==='school'?'wk-school':s.type==='block'?'wk-block':'wk-study';
       const h=Math.max(8,Math.min((s.end-s.start)*0.12,60));
-      return `<div class="wk-bar ${cls}" style="height:${h}px" title="${s.name}"></div>`;
+      return `<div class="wk-bar ${cls}" style="height:${h}px" title="${esc(s.name)}"></div>`;
     }).join('');
     cols+=`<button class="wk-col ${isToday?'on':''}" onclick="jumpTo(${d.getTime()})">
       <div class="wk-cap"><span>${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</span><b>${d.getDate()}</b></div>
@@ -1027,7 +1032,7 @@ function renderSyllabus(){
         ${v.chaps.map((c,ci)=>`
           <div class="chap ${c.on?'':'chap-off'}">
             <button class="chap-check ${c.on?'on':''}" onclick="toggleChap('${subj.replace(/'/g,"\\'")}',${ci})"></button>
-            <span class="chap-name">${c.name}</span>
+            <span class="chap-name">${esc(c.name)}</span>
             <div class="wt-mini">
               <button onclick="bumpWt('${subj.replace(/'/g,"\\'")}',${ci},-1)">−</button>
               <i class="wt-dot wt${c.wt}"></i>
@@ -1102,7 +1107,7 @@ function renderRhythmCard(){
   const blockLines=blocks.length
     ? blocks.map(b=>{
         const dl=b.days.length===7?'every day':DAYS.filter(([k])=>b.days.includes(k)).map(([,l])=>l[0]).join('');
-        return `<div class="rt-block"><span>${b.name}</span><span class="rt-time">${t12(b.start)}–${t12(b.end)} · ${dl}</span></div>`;
+        return `<div class="rt-block"><span>${esc(b.name)}</span><span class="rt-time">${t12(b.start)}–${t12(b.end)} · ${dl}</span></div>`;
       }).join('')
     : '<div class="rt-block" style="color:var(--ink-faint)">No fixed blocks yet</div>';
   el.innerHTML=`
