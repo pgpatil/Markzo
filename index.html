@@ -383,6 +383,7 @@ function fresh(){
     subjects:initSubjects(),
     overrides:{},   // dateKey -> [{type,name,origStart,start,end,skip}] — per-day edits to fixed slots
     slotStatus:{},  // segKey -> 'done'|'partial'|'notdone'
+    studySplits:{}, // dateKey -> [minuteMark,...] — where a free-study window has been split into pieces
     rhythmDone:false,
     setupDone:false
   };
@@ -853,15 +854,26 @@ function buildDay(date){
   let cursor=Math.max(wake,dayStart);
   for(const f of fixed){
     const s=Math.max(f.start,cursor), e=f.end;
-    if(s>cursor) addGap(segs,cursor,s);
+    if(s>cursor) addGap(segs,cursor,s,date);
     if(e>s){ segs.push({type:f.kind,start:s,end:e,name:f.name,origStart:f.origStart}); cursor=Math.max(cursor,e); }
   }
-  if(cursor<sleep) addGap(segs,cursor,sleep);
+  if(cursor<sleep) addGap(segs,cursor,sleep,date);
   if(sleep<DAY_END) segs.push({type:'sleep',start:Math.max(sleep,cursor),end:DAY_END,name:'Asleep'});
   return segs;
 }
-function addGap(segs,s,e){
+// a free window becomes one 'study' segment, unless the student has split
+// it into pieces for this specific date (S.studySplits[dateKey])
+function addGap(segs,s,e,date){
   const dur=e-s;
+  if(dur>=MIN_GAP && date){
+    const marks=((S.studySplits||{})[dKey(date)]||[]).filter(m=>m>s&&m<e).sort((a,b)=>a-b);
+    if(marks.length){
+      let cursor=s;
+      for(const m of marks){ segs.push({type:'study',start:cursor,end:m,name:'Free to study',mins:m-cursor}); cursor=m; }
+      segs.push({type:'study',start:cursor,end:e,name:'Free to study',mins:e-cursor});
+      return;
+    }
+  }
   if(dur>=MIN_GAP) segs.push({type:'study',start:s,end:e,name:'Free to study',mins:dur});
   else if(dur>0) segs.push({type:'tiny',start:s,end:e,name:'Short break',mins:dur});
 }
@@ -968,6 +980,28 @@ function renderSlotSheet(){
       <button class="btn ghost" style="margin-top:8px;color:#c0392b" onclick="skipSlotToday()">${c.type==='tuition-maybe'?"Not happening today":'Skip today'}</button>
       <button class="btn link" onclick="goEditRecurring()">Edit the recurring schedule →</button>
     </div>`;
+  }else{
+    const dk=dKey(c.date);
+    const marks=(S.studySplits&&S.studySplits[dk])||[];
+    const canMergePrev=marks.includes(c.start), canMergeNext=marks.includes(c.end);
+    html+=`<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
+      <label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:9px">Split this time (today only)</label>`;
+    if(c.end-c.start>=20){
+      const mid=mm2hm(Math.round((c.start+c.end)/2/5)*5);
+      html+=`<div class="timefield" style="margin-bottom:10px">
+        <div class="tf"><label>Split at</label><input type="time" id="slotSplitAt" value="${mid}"></div>
+      </div>
+      <button class="btn ghost" onclick="splitStudySlot()">Split into two</button>`;
+    }else{
+      html+=`<div class="field-note" style="margin:0 0 4px">Too short to split further.</div>`;
+    }
+    if(canMergePrev||canMergeNext){
+      html+=`<div style="display:flex;gap:8px;margin-top:10px">
+        ${canMergePrev?`<button class="btn ghost" style="flex:1" onclick="mergeStudySlot('prev')">Merge with previous</button>`:''}
+        ${canMergeNext?`<button class="btn ghost" style="flex:1" onclick="mergeStudySlot('next')">Merge with next</button>`:''}
+      </div>`;
+    }
+    html+=`</div>`;
   }
   html+=`<button class="btn" style="margin-top:18px" onclick="closeSlotSheet()">Done</button>`;
   document.getElementById('slotSheetInner').innerHTML=html;
@@ -982,6 +1016,27 @@ function setSlotStatus(v){
   if(S.slotStatus[slotCtx.key]===v) delete S.slotStatus[slotCtx.key];
   else S.slotStatus[slotCtx.key]=v;
   save(); renderSlotSheet(); renderTimeline();
+}
+function splitStudySlot(){
+  const c=slotCtx;
+  const v=document.getElementById('slotSplitAt').value;
+  if(!v){toast('Pick a split time');return;}
+  const m=hm2m(v);
+  if(m<=c.start+4 || m>=c.end-4){toast('Pick a time inside this slot');return;}
+  const dk=dKey(c.date);
+  if(!S.studySplits)S.studySplits={};
+  if(!S.studySplits[dk])S.studySplits[dk]=[];
+  if(!S.studySplits[dk].includes(m)) S.studySplits[dk].push(m);
+  save(); closeSlotSheet(); renderTimeline();
+  toast('Split added for today');
+}
+function mergeStudySlot(dir){
+  const c=slotCtx;
+  const dk=dKey(c.date);
+  const mark=dir==='prev'?c.start:c.end;
+  if(S.studySplits&&S.studySplits[dk]) S.studySplits[dk]=S.studySplits[dk].filter(m=>m!==mark);
+  save(); closeSlotSheet(); renderTimeline();
+  toast('Merged');
 }
 function overrideList(){
   const dk=dKey(slotCtx.date);
@@ -1195,6 +1250,7 @@ function boot(){
     if(!S.blocks)S.blocks=[];
     if(!S.overrides)S.overrides={};
     if(!S.slotStatus)S.slotStatus={};
+    if(!S.studySplits)S.studySplits={};
     if(!S.subjects)S.subjects=initSubjects();
     else { // add any newly-recognised subjects without touching existing ones
       const seeded=initSubjects();
