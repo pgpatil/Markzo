@@ -410,6 +410,7 @@ function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&l
    ============================================================ */
 const DAYS=[['MO','Mon'],['TU','Tue'],['WE','Wed'],['TH','Thu'],['FR','Fri'],['SA','Sat'],['SU','Sun']];
 let onbStep=0;
+let editMode=false; // true when onboarding was opened to edit already-saved data, not for first-time setup
 let draft={start:'08:00',end:'14:00',days:['MO','TU','WE','TH','FR'],
   sat:{on:false,weeks:[1,3],start:'08:00',end:'11:00'}};
 let rdraft={
@@ -426,7 +427,7 @@ const STEPS=[
       <div class="eyebrow">ICSE Class 10</div>
       <h1>A plan that fits your real day.</h1>
       <div class="lead">First, your school week — so study only ever lands in the hours you're actually free. Takes a few taps.</div>`,
-    foot:()=>`<button class="btn" onclick="next()">Start</button>`
+    foot:()=>`<button class="btn" onclick="next()">Start</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':''}`
   },
   {  // school hours
     render:()=>`
@@ -478,7 +479,7 @@ const STEPS=[
           <div class="field-note">Tap the Saturdays your school runs. A 5th Saturday is usually off.</div>
         </div>
       </div>`,
-    foot:()=>`<button class="btn" onclick="saveSchoolStep()">Next</button><button class="btn link" onclick="prev()">Back</button>`
+    foot:()=>`<button class="btn" onclick="saveSchoolStep()">Next</button><button class="btn link" onclick="prev()">Back</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':''}`
   },
   {  // daily rhythm: wake, sleep, custom blocks
     render:()=>`
@@ -495,7 +496,7 @@ const STEPS=[
       <div id="blockList">${renderBlockDrafts()}</div>
       <button class="btn ghost" style="margin-top:12px" onclick="addBlockDraft()">+ Add a block</button>
       <div class="field-note">Add meals, tuition, gym, travel — anything that repeats. Each can run on its own days.</div>`,
-    foot:()=>`<button class="btn" onclick="finishSetup()">Save my routine</button><button class="btn link" onclick="prev()">Back</button>`
+    foot:()=>`<button class="btn" onclick="finishSetup()">Save my routine</button><button class="btn link" onclick="prev()">Back</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':''}`
   }
 ];
 
@@ -685,6 +686,7 @@ function finishSetup(){
   S.rhythmDone=true;
   S.setupDone=true;
   save();
+  editMode=false;
   boot();
 }
 
@@ -1264,10 +1266,17 @@ function seedDraftsFromState(){
 }
 function openOnbAt(step){
   onbStep=step;
+  editMode=true;
   document.getElementById('app').style.display='none';
   document.getElementById('bottomNav').style.display='none';
   document.getElementById('onb').style.display='flex';
   renderOnb();
+}
+function cancelEdit(){
+  editMode=false;
+  document.getElementById('onb').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('bottomNav').style.display='flex';
 }
 function editSchool(){ seedDraftsFromState(); openOnbAt(1); }
 function editRhythm(){ seedDraftsFromState(); openOnbAt(2); }
