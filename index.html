@@ -130,7 +130,11 @@
 
   /* timeline */
   .timeline{position:relative;padding-left:4px;}
-  .seg{display:flex;gap:14px;align-items:flex-start;padding:13px 15px;border-radius:14px;margin-bottom:9px;border:1px solid var(--line);}
+  .seg{position:relative;display:flex;gap:14px;align-items:flex-start;padding:13px 15px;border-radius:14px;margin-bottom:9px;border:1px solid var(--line);}
+  .seg-status-dot{position:absolute;top:12px;right:12px;width:9px;height:9px;border-radius:50%;}
+  .sd-done{background:var(--study);}
+  .sd-partial{background:var(--test);}
+  .sd-notdone{background:#c0392b;}
   .seg-time{font-size:12.5px;font-weight:700;color:var(--ink-faint);min-width:54px;padding-top:1px;}
   .seg-body{flex:1;}
   .seg-title{font-size:15px;font-weight:650;}
@@ -249,9 +253,15 @@
 <!-- ================= APP SHELL ================= -->
 <div id="app">
   <div class="wrap">
-    <div class="topbar">
-      <div class="date" id="topDate">—</div>
-      <h1 id="appTitle">Today</h1>
+    <div class="topbar" style="display:flex;align-items:flex-end;justify-content:space-between;gap:12px">
+      <div>
+        <div class="date" id="topDate">—</div>
+        <h1 id="appTitle">Today</h1>
+      </div>
+      <button onclick="setPage('setup')" title="Edit schedule" aria-label="Edit schedule"
+        style="width:38px;height:38px;flex:none;border-radius:11px;background:var(--card);border:1px solid var(--line);display:grid;place-items:center;color:var(--ink-soft);margin-bottom:2px">
+        <svg viewBox="0 0 24 24" width="17" height="17" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
     </div>
 
     <!-- HOME PAGE -->
@@ -319,6 +329,11 @@
   </div>
 </div>
 
+<!-- slot edit sheet: study slots + fixed items (school/blocks/tuition) -->
+<div class="sheet-bg" id="slotBg">
+  <div class="sheet" id="slotSheetInner" style="max-height:88vh;overflow-y:auto"></div>
+</div>
+
 <script>
 /* ============================================================
    STATE  — the locked foundation starts here.
@@ -366,6 +381,8 @@ function fresh(){
     sleep:{time:'22:30',days:['MO','TU','WE','TH','FR','SA','SU']},
     blocks:[],   // {id,name,start,end,days:[...]}
     subjects:initSubjects(),
+    overrides:{},   // dateKey -> [{type,name,origStart,start,end,skip}] — per-day edits to fixed slots
+    slotStatus:{},  // segKey -> 'done'|'partial'|'notdone'
     rhythmDone:false,
     setupDone:false
   };
@@ -385,12 +402,15 @@ function t12(t){ if(!t) return '—'; let [h,m]=t.split(':').map(Number);
   const ap=h>=12?'pm':'am'; h=h%12||12; return h+(m?':'+String(m).padStart(2,'0'):'')+ap; }
 function toast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');
   clearTimeout(e._t);e._t=setTimeout(()=>e.classList.remove('show'),1900);}
+// escape user-supplied text before it's dropped into innerHTML/attributes
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 
 /* ============================================================
    ONBOARDING  — step 1 is school hours (upload or by hand)
    ============================================================ */
 const DAYS=[['MO','Mon'],['TU','Tue'],['WE','Wed'],['TH','Thu'],['FR','Fri'],['SA','Sat'],['SU','Sun']];
 let onbStep=0;
+let editMode=false; // true when onboarding was opened to edit already-saved data, not for first-time setup
 let draft={start:'08:00',end:'14:00',days:['MO','TU','WE','TH','FR'],
   sat:{on:false,weeks:[1,3],start:'08:00',end:'11:00'}};
 let rdraft={
@@ -407,7 +427,7 @@ const STEPS=[
       <div class="eyebrow">ICSE Class 10</div>
       <h1>A plan that fits your real day.</h1>
       <div class="lead">First, your school week — so study only ever lands in the hours you're actually free. Takes a few taps.</div>`,
-    foot:()=>`<button class="btn" onclick="next()">Start</button>`
+    foot:()=>`<button class="btn" onclick="next()">Start</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':''}`
   },
   {  // school hours
     render:()=>`
@@ -423,6 +443,7 @@ const STEPS=[
       <input type="file" id="schoolFile" accept="image/*" style="display:none" onchange="readSchool(event)">
       <div class="prog" id="schProg" style="display:none"><i id="schBar"></i></div>
       <div id="schStatus" class="field-note" style="display:none"></div>
+      <div class="field-note"><a href="timetable.html" target="_blank" rel="noopener" style="color:var(--study);font-weight:650">Try the AI timetable reader instead (beta) →</a></div>
 
       <div class="or">or set by hand</div>
 
@@ -458,7 +479,7 @@ const STEPS=[
           <div class="field-note">Tap the Saturdays your school runs. A 5th Saturday is usually off.</div>
         </div>
       </div>`,
-    foot:()=>`<button class="btn" onclick="saveSchoolStep()">Next</button>`
+    foot:()=>`<button class="btn" onclick="saveSchoolStep()">Next</button><button class="btn link" onclick="prev()">Back</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':''}`
   },
   {  // daily rhythm: wake, sleep, custom blocks
     render:()=>`
@@ -475,7 +496,7 @@ const STEPS=[
       <div id="blockList">${renderBlockDrafts()}</div>
       <button class="btn ghost" style="margin-top:12px" onclick="addBlockDraft()">+ Add a block</button>
       <div class="field-note">Add meals, tuition, gym, travel — anything that repeats. Each can run on its own days.</div>`,
-    foot:()=>`<button class="btn" onclick="finishSetup()">Save my routine</button>`
+    foot:()=>`<button class="btn" onclick="finishSetup()">Save my routine</button><button class="btn link" onclick="prev()">Back</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':''}`
   }
 ];
 
@@ -489,6 +510,7 @@ function renderOnb(){
   document.getElementById('onbFoot').innerHTML=STEPS[onbStep].foot();
 }
 function next(){ if(onbStep<STEPS.length-1){onbStep++;renderOnb();} }
+function prev(){ if(onbStep>0){onbStep--;renderOnb();} }
 function toggleDay(k,el){
   const i=draft.days.indexOf(k);
   if(i>=0)draft.days.splice(i,1); else draft.days.push(k);
@@ -511,7 +533,7 @@ function renderBlockDrafts(){
   return rdraft.blocks.map(b=>`
     <div class="block-draft" data-id="${b.id}">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-        <input type="text" placeholder="Name (e.g. Lunch)" value="${b.name||''}"
+        <input type="text" placeholder="Name (e.g. Lunch)" value="${esc(b.name||'')}"
           oninput="setBlock(${b.id},'name',this.value)"
           style="flex:1;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--card);font-size:15px">
         <button onclick="removeBlock(${b.id})" style="color:#c0392b;font-weight:700;font-size:13px;padding:8px">Remove</button>
@@ -648,6 +670,7 @@ function acceptReview(){
 }
 
 function finishSetup(){
+  if(hm2m(rdraft.wake.time)>=hm2m(rdraft.sleep.time)){toast('Sleep time should be after wake time');return;}
   // validate blocks
   for(const b of rdraft.blocks){
     if(!b.name.trim()){toast('Name each block, or remove it');return;}
@@ -663,6 +686,7 @@ function finishSetup(){
   S.rhythmDone=true;
   S.setupDone=true;
   save();
+  editMode=false;
   boot();
 }
 
@@ -691,7 +715,7 @@ function parsePaste(){
     ${!res.date?`<input type="date" id="pasteDate" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--paper-2)">`:''}
     ${res.slots.map((s,i)=>`
       <div class="card" style="padding:11px 13px;margin-bottom:8px;display:flex;gap:10px;align-items:center">
-        <input value="${s.subject}" onchange="pasteParsed.slots[${i}].subject=this.value"
+        <input value="${esc(s.subject)}" onchange="pasteParsed.slots[${i}].subject=this.value"
           style="flex:1;padding:9px;border:1px solid var(--line);border-radius:9px;background:var(--paper-2);font-size:14px">
         <span style="font-size:13px;color:var(--ink-soft);white-space:nowrap">${m2t(s.start)}–${m2t(s.end)}</span>
       </div>`).join('')}
@@ -750,7 +774,7 @@ function commitPaste(){
   if(!date){ const v=document.getElementById('pasteDate'); if(v&&v.value){const [y,mo,d]=v.value.split('-').map(Number);date=new Date(y,mo-1,d);} }
   if(!date){toast('Pick the date');return;}
   const weekly=document.getElementById('pasteWeekly')?.checked;
-  const dateKey=date.getFullYear()+'-'+(date.getMonth()+1)+'-'+date.getDate();
+  const dateKey=dKey(date);
   if(!S.tuition)S.tuition={byDate:{},pattern:{}};
   // exact blocks for this date
   S.tuition.byDate[dateKey]=pasteParsed.slots.map(s=>({name:s.subject,start:s.start,end:s.end}));
@@ -775,7 +799,9 @@ let viewDate=new Date();
 function m2t(m){if(m>=1440)return '12am';let h=Math.floor(m/60),mm=m%60;const ap=h>=12?'pm':'am';let hh=h%12||12;
   return hh+(mm?':'+String(mm).padStart(2,'0'):'')+ap;}
 function hm2m(t){const [h,m]=t.split(':').map(Number);return h*60+m;}
+function mm2hm(m){return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
 function weekOfMonth(d){return Math.floor((d.getDate()-1)/7)+1;}
+function dKey(d){return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
 
 function fixedFor(date){
   const dk=DOW[date.getDay()];
@@ -793,7 +819,7 @@ function fixedFor(date){
     out.push({name:b.name,start:hm2m(b.start),end:hm2m(b.end),kind:'block'});
   }
   // tuition: exact blocks for this date, else tentative from weekday pattern
-  const tkey=date.getFullYear()+'-'+(date.getMonth()+1)+'-'+date.getDate();
+  const tkey=dKey(date);
   if(S.tuition){
     const exact=S.tuition.byDate&&S.tuition.byDate[tkey];
     if(exact){
@@ -802,19 +828,33 @@ function fixedFor(date){
       for(const t of S.tuition.pattern[date.getDay()]) out.push({name:t.name+' (expected)',start:t.start,end:t.end,kind:'tuition-maybe'});
     }
   }
-  return out.sort((a,b)=>a.start-b.start);
+  // every fixed item keeps its scheduled start as a stable identity, then
+  // today-only overrides (time change or skip) are layered on top of it
+  for(const o of out) o.origStart=o.start;
+  const ovs=(S.overrides&&S.overrides[tkey])||[];
+  let result=out;
+  if(ovs.length){
+    result=[];
+    for(const item of out){
+      const ov=ovs.find(v=>v.type===item.kind&&v.name===item.name&&v.origStart===item.origStart);
+      if(!ov) result.push(item);
+      else if(!ov.skip) result.push({...item,start:ov.start,end:ov.end});
+    }
+  }
+  return result.sort((a,b)=>a.start-b.start);
 }
 
 function buildDay(date){
   const wake=hm2m(S.wake.time), sleep=hm2m(S.sleep.time);
+  const dayStart=Math.min(DAY_START,wake); // don't clip a wake time earlier than the default window
   let fixed=fixedFor(date).filter(f=>f.end>f.start);
   const segs=[];
-  if(wake>DAY_START) segs.push({type:'sleep',start:DAY_START,end:wake,name:'Asleep'});
-  let cursor=Math.max(wake,DAY_START);
+  if(wake>dayStart) segs.push({type:'sleep',start:dayStart,end:wake,name:'Asleep'});
+  let cursor=Math.max(wake,dayStart);
   for(const f of fixed){
     const s=Math.max(f.start,cursor), e=f.end;
     if(s>cursor) addGap(segs,cursor,s);
-    if(e>s){ segs.push({type:f.kind,start:s,end:e,name:f.name}); cursor=Math.max(cursor,e); }
+    if(e>s){ segs.push({type:f.kind,start:s,end:e,name:f.name,origStart:f.origStart}); cursor=Math.max(cursor,e); }
   }
   if(cursor<sleep) addGap(segs,cursor,sleep);
   if(sleep<DAY_END) segs.push({type:'sleep',start:Math.max(sleep,cursor),end:DAY_END,name:'Asleep'});
@@ -837,19 +877,30 @@ function renderTimeline(){
       const lab=s.mins>=60?(Math.floor(s.mins/60)+'h'+(s.mins%60?(' '+(s.mins%60)+'m'):'')):s.mins+'m';
       const key=slotKey(viewDate,s.start);
       const manual=(S.slotTasks||{})[key];
-      html+=`<div class="seg seg-study ${manual?'has-task':''}" style="min-height:${Math.max(54,Math.min(dur*0.7,150))}px" onclick="editSlot('${key}',${s.start},${s.mins})">
+      const status=(S.slotStatus||{})[key];
+      html+=`<div class="seg seg-study ${manual?'has-task':''}" style="min-height:${Math.max(54,Math.min(dur*0.7,150))}px" onclick="openSlotSheet('study',${s.start})">
         <div class="seg-time">${m2t(s.start)}</div>
         <div class="seg-body">
-          <div class="seg-title">${manual?manual:'Free to study · '+lab}</div>
-          <div class="seg-note">${manual?'Tap to change · '+lab:'Tap to add what to study'}</div>
-        </div></div>`;
-    }else{
+          <div class="seg-title">${manual?esc(manual):'Free to study · '+lab}</div>
+          <div class="seg-note">${manual?'Tap to change · '+lab:'Tap to add what to study'}${status?' · '+STATUS_LABEL[status]:''}</div>
+        </div>${status?`<div class="seg-status-dot sd-${status}"></div>`:''}</div>`;
+    }else if(s.type==='sleep'){
       html+=`<div class="seg seg-${s.type}">
         <div class="seg-time">${m2t(s.start)}</div>
         <div class="seg-body">
-          <div class="seg-title">${s.name}</div>
+          <div class="seg-title">${esc(s.name)}</div>
           <div class="seg-note">${m2t(s.start)} – ${m2t(s.end)}</div>
         </div></div>`;
+    }else{
+      const origStart=s.origStart!=null?s.origStart:s.start;
+      const key=fixedKey(viewDate,s.type,s.name,origStart);
+      const status=(S.slotStatus||{})[key];
+      html+=`<div class="seg seg-${s.type}" onclick="openSlotSheet('${s.type}',${origStart})">
+        <div class="seg-time">${m2t(s.start)}</div>
+        <div class="seg-body">
+          <div class="seg-title">${esc(s.name)}</div>
+          <div class="seg-note">${m2t(s.start)} – ${m2t(s.end)}${status?' · '+STATUS_LABEL[status]:''}</div>
+        </div>${status?`<div class="seg-status-dot sd-${status}"></div>`:''}</div>`;
     }
   }
   host.innerHTML=html||'<div style="padding:30px;text-align:center;color:var(--ink-faint)">Nothing set for this day.</div>';
@@ -874,17 +925,98 @@ function renderDayNav(){
 }
 function pickDay(ts){viewDate=new Date(ts);renderTimeline();}
 
-/* ---- manual study-slot entry ---- */
-function slotKey(date,startMin){
-  const d=new Date(date); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()+'@'+startMin;
+/* ---- slot identity & status ---- */
+function slotKey(date,startMin){ return dKey(new Date(date))+'@'+startMin; }
+function fixedKey(date,type,name,origStart){ return dKey(new Date(date))+'#'+type+'#'+name+'#'+origStart; }
+const STATUS_LABEL={done:'Done',partial:'Partly done',notdone:'Not done'};
+
+/* ---- slot edit sheet: study task+status, or today-only edits to a fixed item ---- */
+let slotCtx=null;
+function openSlotSheet(type,origStart){
+  const segs=buildDay(viewDate);
+  const seg=segs.find(x=>x.type===type && (x.origStart!=null?x.origStart:x.start)===origStart);
+  if(!seg) return;
+  slotCtx={type,origStart,name:seg.name,start:seg.start,end:seg.end,date:new Date(viewDate)};
+  slotCtx.key = type==='study' ? slotKey(slotCtx.date,seg.start) : fixedKey(slotCtx.date,type,seg.name,origStart);
+  renderSlotSheet();
+  document.getElementById('slotBg').classList.add('show');
 }
-function editSlot(key,start,mins){
-  const cur=(S.slotTasks||{})[key]||'';
-  const v=prompt('What will you study in this '+(mins>=60?Math.floor(mins/60)+'h'+(mins%60?(' '+mins%60+'m'):''):mins+'m')+' slot?\n(Leave blank to clear)',cur);
-  if(v===null) return;
+function closeSlotSheet(){ document.getElementById('slotBg').classList.remove('show'); }
+function renderSlotSheet(){
+  const c=slotCtx, isStudy=c.type==='study';
+  const status=(S.slotStatus||{})[c.key];
+  let html=`<h2>${esc(c.name)}</h2><div class="sub">${m2t(c.start)} – ${m2t(c.end)}</div>`;
+  if(isStudy){
+    html+=`<label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:14px 0 7px">What will you study</label>
+      <input id="slotTaskInput" type="text" value="${esc((S.slotTasks||{})[c.key]||'')}" placeholder="e.g. Trigonometry practice" onchange="saveSlotTask(this.value)"
+        style="width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--paper-2);font-size:15px">`;
+  }
+  html+=`<label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:16px 0 7px">Status</label>
+    <div class="day-toggle">
+      <button class="${status==='notdone'?'on':''}" onclick="setSlotStatus('notdone')">Not done</button>
+      <button class="${status==='partial'?'on':''}" onclick="setSlotStatus('partial')">Partial</button>
+      <button class="${status==='done'?'on':''}" onclick="setSlotStatus('done')">Done</button>
+    </div>`;
+  if(!isStudy){
+    html+=`<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
+      <label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:9px">Change just today</label>
+      <div class="timefield" style="margin-bottom:12px">
+        <div class="tf"><label>Start</label><input type="time" id="slotStart" value="${mm2hm(c.start)}"></div>
+        <div class="tf"><label>End</label><input type="time" id="slotEnd" value="${mm2hm(c.end)}"></div>
+      </div>
+      <button class="btn ghost" onclick="saveSlotTimeOverride()">Save for today</button>
+      <button class="btn ghost" style="margin-top:8px;color:#c0392b" onclick="skipSlotToday()">${c.type==='tuition-maybe'?"Not happening today":'Skip today'}</button>
+      <button class="btn link" onclick="goEditRecurring()">Edit the recurring schedule →</button>
+    </div>`;
+  }
+  html+=`<button class="btn" style="margin-top:18px" onclick="closeSlotSheet()">Done</button>`;
+  document.getElementById('slotSheetInner').innerHTML=html;
+}
+function saveSlotTask(v){
   if(!S.slotTasks)S.slotTasks={};
-  if(v.trim())S.slotTasks[key]=v.trim(); else delete S.slotTasks[key];
+  if(v.trim())S.slotTasks[slotCtx.key]=v.trim(); else delete S.slotTasks[slotCtx.key];
   save(); renderTimeline();
+}
+function setSlotStatus(v){
+  if(!S.slotStatus)S.slotStatus={};
+  if(S.slotStatus[slotCtx.key]===v) delete S.slotStatus[slotCtx.key];
+  else S.slotStatus[slotCtx.key]=v;
+  save(); renderSlotSheet(); renderTimeline();
+}
+function overrideList(){
+  const dk=dKey(slotCtx.date);
+  if(!S.overrides)S.overrides={};
+  if(!S.overrides[dk])S.overrides[dk]=[];
+  return S.overrides[dk];
+}
+function saveSlotTimeOverride(){
+  const c=slotCtx;
+  const sv=document.getElementById('slotStart').value, ev=document.getElementById('slotEnd').value;
+  if(!sv||!ev){toast('Set both times');return;}
+  if(sv>=ev){toast('End should be after start');return;}
+  const list=overrideList();
+  const existing=list.find(o=>o.type===c.type&&o.name===c.name&&o.origStart===c.origStart);
+  const val={type:c.type,name:c.name,origStart:c.origStart,start:hm2m(sv),end:hm2m(ev),skip:false};
+  if(existing) Object.assign(existing,val); else list.push(val);
+  save(); closeSlotSheet(); renderTimeline();
+  toast('Updated for today only');
+}
+function skipSlotToday(){
+  const c=slotCtx;
+  const list=overrideList();
+  const existing=list.find(o=>o.type===c.type&&o.name===c.name&&o.origStart===c.origStart);
+  if(existing) existing.skip=true;
+  else list.push({type:c.type,name:c.name,origStart:c.origStart,skip:true});
+  save(); closeSlotSheet(); renderTimeline();
+  toast('Removed for today');
+}
+function goEditRecurring(){
+  const c=slotCtx;
+  closeSlotSheet();
+  if(c.type==='school'){ seedDraftsFromState(); openOnbAt(1); return; }
+  const isManualBlock=(S.blocks||[]).some(b=>b.name===c.name);
+  if(isManualBlock){ seedDraftsFromState(); openOnbAt(2); }
+  else { setPage('home'); openPaste(); }
 }
 
 /* ---- bottom nav page switching ---- */
@@ -932,7 +1064,7 @@ function renderWeek(){
     const bars=segs.map(s=>{
       const cls=s.type==='school'?'wk-school':s.type==='block'?'wk-block':'wk-study';
       const h=Math.max(8,Math.min((s.end-s.start)*0.12,60));
-      return `<div class="wk-bar ${cls}" style="height:${h}px" title="${s.name}"></div>`;
+      return `<div class="wk-bar ${cls}" style="height:${h}px" title="${esc(s.name)}"></div>`;
     }).join('');
     cols+=`<button class="wk-col ${isToday?'on':''}" onclick="jumpTo(${d.getTime()})">
       <div class="wk-cap"><span>${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}</span><b>${d.getDate()}</b></div>
@@ -1027,7 +1159,7 @@ function renderSyllabus(){
         ${v.chaps.map((c,ci)=>`
           <div class="chap ${c.on?'':'chap-off'}">
             <button class="chap-check ${c.on?'on':''}" onclick="toggleChap('${subj.replace(/'/g,"\\'")}',${ci})"></button>
-            <span class="chap-name">${c.name}</span>
+            <span class="chap-name">${esc(c.name)}</span>
             <div class="wt-mini">
               <button onclick="bumpWt('${subj.replace(/'/g,"\\'")}',${ci},-1)">−</button>
               <i class="wt-dot wt${c.wt}"></i>
@@ -1061,6 +1193,8 @@ function boot(){
   if(S){ if(!S.wake)S.wake={time:'06:30',days:[...ALLDAYS]};
     if(!S.sleep)S.sleep={time:'22:30',days:[...ALLDAYS]};
     if(!S.blocks)S.blocks=[];
+    if(!S.overrides)S.overrides={};
+    if(!S.slotStatus)S.slotStatus={};
     if(!S.subjects)S.subjects=initSubjects();
     else { // add any newly-recognised subjects without touching existing ones
       const seeded=initSubjects();
@@ -1102,7 +1236,7 @@ function renderRhythmCard(){
   const blockLines=blocks.length
     ? blocks.map(b=>{
         const dl=b.days.length===7?'every day':DAYS.filter(([k])=>b.days.includes(k)).map(([,l])=>l[0]).join('');
-        return `<div class="rt-block"><span>${b.name}</span><span class="rt-time">${t12(b.start)}–${t12(b.end)} · ${dl}</span></div>`;
+        return `<div class="rt-block"><span>${esc(b.name)}</span><span class="rt-time">${t12(b.start)}–${t12(b.end)} · ${dl}</span></div>`;
       }).join('')
     : '<div class="rt-block" style="color:var(--ink-faint)">No fixed blocks yet</div>';
   el.innerHTML=`
@@ -1132,10 +1266,17 @@ function seedDraftsFromState(){
 }
 function openOnbAt(step){
   onbStep=step;
+  editMode=true;
   document.getElementById('app').style.display='none';
   document.getElementById('bottomNav').style.display='none';
   document.getElementById('onb').style.display='flex';
   renderOnb();
+}
+function cancelEdit(){
+  editMode=false;
+  document.getElementById('onb').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('bottomNav').style.display='flex';
 }
 function editSchool(){ seedDraftsFromState(); openOnbAt(1); }
 function editRhythm(){ seedDraftsFromState(); openOnbAt(2); }

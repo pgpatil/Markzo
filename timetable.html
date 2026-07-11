@@ -49,7 +49,7 @@
 
   <div class="keybar">
     <label>Your backend URL</label>
-    <input id="workerUrl" value="https://yellow-river-2f4e.pankajpclaude.workers.dev" />
+    <input id="workerUrl" placeholder="https://your-worker.example.workers.dev" />
   </div>
 
   <div class="drop" id="drop" onclick="document.getElementById('file').click()">
@@ -66,6 +66,11 @@
 
 <script>
 let dataUrl=null;
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// remember the backend URL locally so it isn't hardcoded in the page source
+const workerUrlEl=document.getElementById('workerUrl');
+workerUrlEl.value=localStorage.getItem('markzo_worker_url')||'';
+workerUrlEl.addEventListener('change',()=>localStorage.setItem('markzo_worker_url',workerUrlEl.value.trim()));
 function onFile(e){
   const f=e.target.files[0]; if(!f) return;
   const r=new FileReader();
@@ -102,17 +107,17 @@ async function readIt(){
     const res=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},
       body:JSON.stringify({imageDataUrl:dataUrl, prompt:PROMPT})});
     const data=await res.json();
-    if(data.error){ out.innerHTML='<div class="err">Backend error: '+(data.error)+(data.detail?'\n\n'+JSON.stringify(data.detail).slice(0,400):'')+'</div>'; btn.disabled=false; return; }
+    if(data.error){ out.innerHTML='<div class="err">Backend error: '+esc(data.error)+(data.detail?'\n\n'+esc(JSON.stringify(data.detail).slice(0,400)):'')+'</div>'; btn.disabled=false; return; }
     let text=data.text||'';
     text=text.replace(/```json/gi,'').replace(/```/g,'').trim();
     const a=text.indexOf('{'), b=text.lastIndexOf('}');
     if(a>=0&&b>a) text=text.slice(a,b+1);
     let parsed;
     try{ parsed=JSON.parse(text); }
-    catch(pe){ out.innerHTML='<div class="err">Read the image but could not structure it. Raw reply:\n\n'+text.slice(0,600)+'</div>'; btn.disabled=false; return; }
+    catch(pe){ out.innerHTML='<div class="err">Read the image but could not structure it. Raw reply:\n\n'+esc(text.slice(0,600))+'</div>'; btn.disabled=false; return; }
     render(parsed);
   }catch(err){
-    out.innerHTML='<div class="err">Could not reach the backend: '+(err&&err.message||err)+'</div>';
+    out.innerHTML='<div class="err">Could not reach the backend: '+esc(err&&err.message||err)+'</div>';
   }
   btn.disabled=false;
 }
@@ -122,8 +127,8 @@ function render(d){
   const out=document.getElementById('out');
   let html='<div class="sec">School hours</div><div class="card">';
   html+='<div class="row"><span>School day</span><b>'+t12(d.schoolStart)+' – '+t12(d.schoolEnd)+'</b></div>';
-  html+='<div class="row"><span>Days</span><b>'+(d.days||[]).map(x=>DN[x]||x).join(' · ')+'</b></div>';
-  (d.breaks||[]).forEach(b=>html+='<div class="row"><span>'+(b.name||'Break')+'</span><b>'+t12(b.start)+' – '+t12(b.end)+'</b></div>');
+  html+='<div class="row"><span>Days</span><b>'+(d.days||[]).map(x=>esc(DN[x]||x)).join(' · ')+'</b></div>';
+  (d.breaks||[]).forEach(b=>html+='<div class="row"><span>'+esc(b.name||'Break')+'</span><b>'+t12(b.start)+' – '+t12(b.end)+'</b></div>');
   html+='</div>';
   if(d.periods&&d.subjectsByDay){
     html+='<div class="sec">Subjects by period</div><div class="card" style="overflow-x:auto;padding:10px"><table><tr><th>Day</th>';
@@ -131,8 +136,8 @@ function render(d){
     html+='</tr>';
     (d.days||Object.keys(d.subjectsByDay)).forEach(day=>{
       const s=d.subjectsByDay[day]||[];
-      html+='<tr><td><b>'+(DN[day]||day)+'</b></td>';
-      d.periods.forEach((p,i)=>html+='<td class="subj">'+(s[i]||'–')+'</td>');
+      html+='<tr><td><b>'+esc(DN[day]||day)+'</b></td>';
+      d.periods.forEach((p,i)=>html+='<td class="subj">'+esc(s[i]||'–')+'</td>');
       html+='</tr>';
     });
     html+='</table></div><div class="note">Read automatically from your photo through your own backend. In the app you confirm anything off before it saves.</div>';
