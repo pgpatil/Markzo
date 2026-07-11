@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>Markzo — ICSE 10 study planner</title>
-<script defer src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<!-- vendored so the reader still loads if the school WiFi blocks CDNs; only the
+     language/engine data (a few MB, fetched on first use) still comes from jsdelivr -->
+<script defer src="vendor/tesseract.min.js"></script>
 <style>
   :root{
     --paper:#f5f1e8;
@@ -618,17 +620,28 @@ async function readSchool(ev){
   }
   if(typeof Tesseract==='undefined'){
     st.style.display='block';
-    st.textContent='The reader is still loading or was blocked by your connection. Wait a moment and try again, or set the times by hand below.';
+    st.textContent='The reader script failed to load. Reload the page and try again, or set the times by hand below.';
     return;
   }
   prog.style.display='block'; st.style.display='block';
   st.textContent='Reading your timetable on your device…'; bar.style.width='8%';
   let text='';
   try{
-    const res=await Tesseract.recognize(f,'eng',{logger:m=>{
-      if(m.status==='recognizing text') bar.style.width=Math.round(8+m.progress*88)+'%';}});
+    // workerPath is vendored (no CDN needed); the language/engine data still
+    // comes from jsdelivr on first use — that's the piece a school firewall can block
+    const res=await Tesseract.recognize(f,'eng',{
+      workerPath:'vendor/tesseract-worker.min.js',
+      logger:m=>{ if(m.status==='recognizing text') bar.style.width=Math.round(8+m.progress*88)+'%'; }
+    });
     text=res.data.text||'';
-  }catch(e){ prog.style.display='none'; st.textContent='Could not read that image. Try a clearer, straight-on photo, or set the times by hand below.'; return; }
+  }catch(e){
+    prog.style.display='none';
+    st.style.display='block';
+    st.textContent=/network|fetch|load/i.test(e&&e.message||'')
+      ? "Couldn't download the reader's language data — your network may be blocking it. Try a different WiFi/data connection, or set the times by hand below."
+      : 'Could not read that image. Try a clearer, straight-on photo, or set the times by hand below.';
+    return;
+  }
   prog.style.display='none'; st.style.display='none';
   const times=extractTimes(text);
   openReview(times);
@@ -640,7 +653,12 @@ function extractTimes(text){
   while((m=re.exec(text))){
     let h=+m[1], min=+m[2]; if(h>23||min>59) continue;
     const ap=(m[3]||'').toLowerCase().replace(/\./g,'');
-    if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0;
+    if(ap==='pm'&&h<12)h+=12;
+    else if(ap==='am'&&h===12)h=0;
+    // multi-line table headers often separate the time from its am/pm label,
+    // so OCR drops the suffix on afternoon columns — no school runs 1-5am,
+    // so an unlabeled hour in that range is virtually always PM
+    else if(!ap&&h>=1&&h<=5)h+=12;
     mins.push(h*60+min);
   }
   if(mins.length<2) return null;
