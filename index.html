@@ -130,11 +130,13 @@
 
   /* timeline */
   .timeline{position:relative;padding-left:4px;}
-  .seg{position:relative;display:flex;gap:14px;align-items:flex-start;padding:13px 15px;border-radius:14px;margin-bottom:9px;border:1px solid var(--line);}
-  .seg-status-dot{position:absolute;top:12px;right:12px;width:9px;height:9px;border-radius:50%;}
-  .sd-done{background:var(--study);}
-  .sd-partial{background:var(--test);}
-  .sd-notdone{background:#c0392b;}
+  .seg{position:relative;display:flex;gap:14px;align-items:flex-start;padding:13px 15px;border-radius:14px;margin-bottom:9px;border:1px solid var(--line);cursor:pointer;}
+  .seg-status-row{display:flex;gap:6px;margin-top:9px;}
+  .ss-btn{flex:none;width:30px;height:26px;border-radius:8px;border:1px solid var(--line);background:var(--card);
+    font-size:12.5px;color:var(--ink-faint);display:grid;place-items:center;}
+  .ss-btn.ss-notdone.on{background:#fdeceb;border-color:#f4c7c2;color:#c0392b;}
+  .ss-btn.ss-partial.on{background:var(--test-soft);border-color:#eed9bd;color:var(--test);}
+  .ss-btn.ss-done.on{background:var(--study-soft);border-color:#cfe6da;color:var(--study);}
   .seg-time{font-size:12.5px;font-weight:700;color:var(--ink-faint);min-width:54px;padding-top:1px;}
   .seg-body{flex:1;}
   .seg-title{font-size:15px;font-weight:650;}
@@ -384,6 +386,7 @@ function fresh(){
     overrides:{},   // dateKey -> [{type,name,origStart,start,end,skip}] — per-day edits to fixed slots
     slotStatus:{},  // segKey -> 'done'|'partial'|'notdone'
     studySplits:{}, // dateKey -> [minuteMark,...] — where a free-study window has been split into pieces
+    sleepOverrides:{}, // dateKey -> {wake:'HH:MM',sleep:'HH:MM'} — today-only wake/sleep change
     rhythmDone:false,
     setupDone:false
   };
@@ -846,11 +849,14 @@ function fixedFor(date){
 }
 
 function buildDay(date){
-  const wake=hm2m(S.wake.time), sleep=hm2m(S.sleep.time);
+  const sov=(S.sleepOverrides||{})[dKey(date)];
+  const wake=hm2m(sov&&sov.wake?sov.wake:S.wake.time), sleep=hm2m(sov&&sov.sleep?sov.sleep:S.sleep.time);
   const dayStart=Math.min(DAY_START,wake); // don't clip a wake time earlier than the default window
   let fixed=fixedFor(date).filter(f=>f.end>f.start);
   const segs=[];
-  if(wake>dayStart) segs.push({type:'sleep',start:dayStart,end:wake,name:'Asleep'});
+  // origStart -1/-2 are stable identities for the morning/evening sleep blocks,
+  // independent of any per-day time override, so task/status keys don't reset
+  if(wake>dayStart) segs.push({type:'sleep',start:dayStart,end:wake,name:'Asleep',origStart:-1});
   let cursor=Math.max(wake,dayStart);
   for(const f of fixed){
     const s=Math.max(f.start,cursor), e=f.end;
@@ -858,7 +864,7 @@ function buildDay(date){
     if(e>s){ segs.push({type:f.kind,start:s,end:e,name:f.name,origStart:f.origStart}); cursor=Math.max(cursor,e); }
   }
   if(cursor<sleep) addGap(segs,cursor,sleep,date);
-  if(sleep<DAY_END) segs.push({type:'sleep',start:Math.max(sleep,cursor),end:DAY_END,name:'Asleep'});
+  if(sleep<DAY_END) segs.push({type:'sleep',start:Math.max(sleep,cursor),end:DAY_END,name:'Asleep',origStart:-2});
   return segs;
 }
 // a free window becomes one 'study' segment, unless the student has split
@@ -885,34 +891,26 @@ function renderTimeline(){
   for(const s of segs){
     if(s.type==='tiny') continue;
     const dur=s.end-s.start;
+    const origStart=s.origStart!=null?s.origStart:s.start;
     if(s.type==='study'){
       const lab=s.mins>=60?(Math.floor(s.mins/60)+'h'+(s.mins%60?(' '+(s.mins%60)+'m'):'')):s.mins+'m';
       const key=slotKey(viewDate,s.start);
       const manual=(S.slotTasks||{})[key];
-      const status=(S.slotStatus||{})[key];
       html+=`<div class="seg seg-study ${manual?'has-task':''}" style="min-height:${Math.max(54,Math.min(dur*0.7,150))}px" onclick="openSlotSheet('study',${s.start})">
         <div class="seg-time">${m2t(s.start)}</div>
         <div class="seg-body">
           <div class="seg-title">${manual?esc(manual):'Free to study · '+lab}</div>
-          <div class="seg-note">${manual?'Tap to change · '+lab:'Tap to add what to study'}${status?' · '+STATUS_LABEL[status]:''}</div>
-        </div>${status?`<div class="seg-status-dot sd-${status}"></div>`:''}</div>`;
-    }else if(s.type==='sleep'){
-      html+=`<div class="seg seg-${s.type}">
-        <div class="seg-time">${m2t(s.start)}</div>
-        <div class="seg-body">
-          <div class="seg-title">${esc(s.name)}</div>
-          <div class="seg-note">${m2t(s.start)} – ${m2t(s.end)}</div>
+          <div class="seg-note">${manual?'Tap to change · '+lab:'Tap to add what to study'}</div>
+          ${statusRow('study',s.start)}
         </div></div>`;
     }else{
-      const origStart=s.origStart!=null?s.origStart:s.start;
-      const key=fixedKey(viewDate,s.type,s.name,origStart);
-      const status=(S.slotStatus||{})[key];
       html+=`<div class="seg seg-${s.type}" onclick="openSlotSheet('${s.type}',${origStart})">
         <div class="seg-time">${m2t(s.start)}</div>
         <div class="seg-body">
           <div class="seg-title">${esc(s.name)}</div>
-          <div class="seg-note">${m2t(s.start)} – ${m2t(s.end)}${status?' · '+STATUS_LABEL[status]:''}</div>
-        </div>${status?`<div class="seg-status-dot sd-${status}"></div>`:''}</div>`;
+          <div class="seg-note">${m2t(s.start)} – ${m2t(s.end)}</div>
+          ${statusRow(s.type,origStart)}
+        </div></div>`;
     }
   }
   host.innerHTML=html||'<div style="padding:30px;text-align:center;color:var(--ink-faint)">Nothing set for this day.</div>';
@@ -940,47 +938,52 @@ function pickDay(ts){viewDate=new Date(ts);renderTimeline();}
 /* ---- slot identity & status ---- */
 function slotKey(date,startMin){ return dKey(new Date(date))+'@'+startMin; }
 function fixedKey(date,type,name,origStart){ return dKey(new Date(date))+'#'+type+'#'+name+'#'+origStart; }
-const STATUS_LABEL={done:'Done',partial:'Partly done',notdone:'Not done'};
-
-/* ---- slot edit sheet: study task+status, or today-only edits to a fixed item ---- */
-let slotCtx=null;
-function openSlotSheet(type,origStart){
+// resolve a (type, origStart) pair on the currently-viewed day back to its live segment + status key
+function deriveSlot(type,origStart){
   const segs=buildDay(viewDate);
   const seg=segs.find(x=>x.type===type && (x.origStart!=null?x.origStart:x.start)===origStart);
-  if(!seg) return;
-  slotCtx={type,origStart,name:seg.name,start:seg.start,end:seg.end,date:new Date(viewDate)};
-  slotCtx.key = type==='study' ? slotKey(slotCtx.date,seg.start) : fixedKey(slotCtx.date,type,seg.name,origStart);
+  if(!seg) return null;
+  const key = type==='study' ? slotKey(viewDate,seg.start) : fixedKey(viewDate,type,seg.name,origStart);
+  return {seg,key};
+}
+// inline Not done / Partial / Done buttons shown directly on every slot card
+function statusRow(type,origStart){
+  const found=deriveSlot(type,origStart);
+  if(!found) return '';
+  const status=(S.slotStatus||{})[found.key];
+  const btn=(v,label,glyph)=>`<button class="ss-btn ss-${v} ${status===v?'on':''}" title="${label}" onclick="quickStatus(event,'${type}',${origStart},'${v}')">${glyph}</button>`;
+  return `<div class="seg-status-row">${btn('notdone','Not done','✕')}${btn('partial','Partial','◐')}${btn('done','Done','✓')}</div>`;
+}
+function quickStatus(evt,type,origStart,v){
+  evt.stopPropagation();
+  const found=deriveSlot(type,origStart);
+  if(!found) return;
+  if(!S.slotStatus)S.slotStatus={};
+  if(S.slotStatus[found.key]===v) delete S.slotStatus[found.key];
+  else S.slotStatus[found.key]=v;
+  save(); renderTimeline();
+  if(document.getElementById('slotBg').classList.contains('show')) renderSlotSheet();
+}
+
+/* ---- slot edit sheet: study task/split, sleep time, or today-only edits to a fixed item ---- */
+let slotCtx=null;
+function openSlotSheet(type,origStart){
+  const found=deriveSlot(type,origStart);
+  if(!found) return;
+  const {seg,key}=found;
+  slotCtx={type,origStart,name:seg.name,start:seg.start,end:seg.end,date:new Date(viewDate),key};
   renderSlotSheet();
   document.getElementById('slotBg').classList.add('show');
 }
 function closeSlotSheet(){ document.getElementById('slotBg').classList.remove('show'); }
 function renderSlotSheet(){
-  const c=slotCtx, isStudy=c.type==='study';
-  const status=(S.slotStatus||{})[c.key];
+  const c=slotCtx, isStudy=c.type==='study', isSleep=c.type==='sleep';
   let html=`<h2>${esc(c.name)}</h2><div class="sub">${m2t(c.start)} – ${m2t(c.end)}</div>`;
+  html+=`<div style="margin-top:14px">${statusRow(c.type,c.origStart)}</div>`;
   if(isStudy){
-    html+=`<label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:14px 0 7px">What will you study</label>
+    html+=`<label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:16px 0 7px">What will you study</label>
       <input id="slotTaskInput" type="text" value="${esc((S.slotTasks||{})[c.key]||'')}" placeholder="e.g. Trigonometry practice" onchange="saveSlotTask(this.value)"
         style="width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--paper-2);font-size:15px">`;
-  }
-  html+=`<label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin:16px 0 7px">Status</label>
-    <div class="day-toggle">
-      <button class="${status==='notdone'?'on':''}" onclick="setSlotStatus('notdone')">Not done</button>
-      <button class="${status==='partial'?'on':''}" onclick="setSlotStatus('partial')">Partial</button>
-      <button class="${status==='done'?'on':''}" onclick="setSlotStatus('done')">Done</button>
-    </div>`;
-  if(!isStudy){
-    html+=`<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
-      <label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:9px">Change just today</label>
-      <div class="timefield" style="margin-bottom:12px">
-        <div class="tf"><label>Start</label><input type="time" id="slotStart" value="${mm2hm(c.start)}"></div>
-        <div class="tf"><label>End</label><input type="time" id="slotEnd" value="${mm2hm(c.end)}"></div>
-      </div>
-      <button class="btn ghost" onclick="saveSlotTimeOverride()">Save for today</button>
-      <button class="btn ghost" style="margin-top:8px;color:#c0392b" onclick="skipSlotToday()">${c.type==='tuition-maybe'?"Not happening today":'Skip today'}</button>
-      <button class="btn link" onclick="goEditRecurring()">Edit the recurring schedule →</button>
-    </div>`;
-  }else{
     const dk=dKey(c.date);
     const marks=(S.studySplits&&S.studySplits[dk])||[];
     const canMergePrev=marks.includes(c.start), canMergeNext=marks.includes(c.end);
@@ -1002,6 +1005,29 @@ function renderSlotSheet(){
       </div>`;
     }
     html+=`</div>`;
+  }else if(isSleep){
+    const ov=(S.sleepOverrides||{})[dKey(c.date)];
+    html+=`<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
+      <label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:9px">Change just today</label>
+      <div class="timefield" style="margin-bottom:12px">
+        <div class="tf"><label>Wake up</label><input type="time" id="slotWake" value="${ov&&ov.wake?ov.wake:S.wake.time}"></div>
+        <div class="tf"><label>Sleep</label><input type="time" id="slotSleep" value="${ov&&ov.sleep?ov.sleep:S.sleep.time}"></div>
+      </div>
+      <button class="btn ghost" onclick="saveSleepOverride()">Save for today</button>
+      ${ov?`<button class="btn ghost" style="margin-top:8px" onclick="resetSleepOverride()">Reset to usual time</button>`:''}
+      <button class="btn link" onclick="goEditRecurring()">Edit the recurring schedule →</button>
+    </div>`;
+  }else{
+    html+=`<div style="margin-top:22px;border-top:1px solid var(--line);padding-top:16px">
+      <label style="display:block;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);margin-bottom:9px">Change just today</label>
+      <div class="timefield" style="margin-bottom:12px">
+        <div class="tf"><label>Start</label><input type="time" id="slotStart" value="${mm2hm(c.start)}"></div>
+        <div class="tf"><label>End</label><input type="time" id="slotEnd" value="${mm2hm(c.end)}"></div>
+      </div>
+      <button class="btn ghost" onclick="saveSlotTimeOverride()">Save for today</button>
+      <button class="btn ghost" style="margin-top:8px;color:#c0392b" onclick="skipSlotToday()">${c.type==='tuition-maybe'?"Not happening today":'Skip today'}</button>
+      <button class="btn link" onclick="goEditRecurring()">Edit the recurring schedule →</button>
+    </div>`;
   }
   html+=`<button class="btn" style="margin-top:18px" onclick="closeSlotSheet()">Done</button>`;
   document.getElementById('slotSheetInner').innerHTML=html;
@@ -1010,12 +1036,6 @@ function saveSlotTask(v){
   if(!S.slotTasks)S.slotTasks={};
   if(v.trim())S.slotTasks[slotCtx.key]=v.trim(); else delete S.slotTasks[slotCtx.key];
   save(); renderTimeline();
-}
-function setSlotStatus(v){
-  if(!S.slotStatus)S.slotStatus={};
-  if(S.slotStatus[slotCtx.key]===v) delete S.slotStatus[slotCtx.key];
-  else S.slotStatus[slotCtx.key]=v;
-  save(); renderSlotSheet(); renderTimeline();
 }
 function splitStudySlot(){
   const c=slotCtx;
@@ -1065,10 +1085,27 @@ function skipSlotToday(){
   save(); closeSlotSheet(); renderTimeline();
   toast('Removed for today');
 }
+function saveSleepOverride(){
+  const c=slotCtx;
+  const wv=document.getElementById('slotWake').value, sv=document.getElementById('slotSleep').value;
+  if(!wv||!sv){toast('Set both times');return;}
+  if(wv>=sv){toast('Sleep time should be after wake time');return;}
+  if(!S.sleepOverrides)S.sleepOverrides={};
+  S.sleepOverrides[dKey(c.date)]={wake:wv,sleep:sv};
+  save(); closeSlotSheet(); renderTimeline();
+  toast('Updated for today only');
+}
+function resetSleepOverride(){
+  const c=slotCtx;
+  if(S.sleepOverrides) delete S.sleepOverrides[dKey(c.date)];
+  save(); closeSlotSheet(); renderTimeline();
+  toast('Reset to your usual time');
+}
 function goEditRecurring(){
   const c=slotCtx;
   closeSlotSheet();
   if(c.type==='school'){ seedDraftsFromState(); openOnbAt(1); return; }
+  if(c.type==='sleep'){ seedDraftsFromState(); openOnbAt(2); return; }
   const isManualBlock=(S.blocks||[]).some(b=>b.name===c.name);
   if(isManualBlock){ seedDraftsFromState(); openOnbAt(2); }
   else { setPage('home'); openPaste(); }
@@ -1251,6 +1288,7 @@ function boot(){
     if(!S.overrides)S.overrides={};
     if(!S.slotStatus)S.slotStatus={};
     if(!S.studySplits)S.studySplits={};
+    if(!S.sleepOverrides)S.sleepOverrides={};
     if(!S.subjects)S.subjects=initSubjects();
     else { // add any newly-recognised subjects without touching existing ones
       const seeded=initSubjects();
