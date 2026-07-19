@@ -245,6 +245,27 @@
   .rt-block{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:7px 0;font-size:14.5px;border-top:1px dashed var(--line);}
   .rt-block:first-child{border-top:none;}
   .rt-block .rt-time{font-size:13px;color:var(--ink-soft);white-space:nowrap;}
+
+  /* ---- FAQ ---- */
+  .faq-item{border:1px solid var(--line);border-radius:14px;background:var(--card);margin-bottom:10px;overflow:hidden;}
+  .faq-item summary{padding:14px 16px;font-size:14.5px;font-weight:650;cursor:pointer;list-style:none;}
+  .faq-item summary::-webkit-details-marker{display:none;}
+  .faq-item summary::after{content:"+";float:right;color:var(--ink-faint);font-weight:700;}
+  .faq-item[open] summary::after{content:"−";}
+  .faq-item p{margin:0;padding:0 16px 16px;font-size:13.5px;color:var(--ink-soft);line-height:1.55;}
+
+  /* ---- responsive: tablet & desktop get more breathing room and a top nav
+     instead of a mobile thumb-reach bottom bar ---- */
+  @media (min-width:700px){
+    .wrap,.onb-top,.onb-body,.onb-foot{max-width:640px;}
+  }
+  @media (min-width:1000px){
+    .wrap,.onb-top,.onb-body,.onb-foot{max-width:860px;}
+    body{padding-bottom:0;padding-top:66px;}
+    #bottomNav{top:0;bottom:auto;border-top:none;border-bottom:1px solid var(--line);}
+    .bn{padding:9px 28px;}
+    .view-toggle{max-width:420px;}
+  }
 </style>
 </head>
 <body>
@@ -288,14 +309,51 @@
 
     <!-- SETUP PAGE -->
     <div id="page-setup" style="display:none">
-      <div class="section-label">Subjects &amp; syllabus</div>
-      <div id="syllabusBody"></div>
-      <div class="section-label" style="margin-top:26px">Your school week</div>
-      <div class="card" id="schoolCard"></div>
-      <div class="section-label">Your daily routine</div>
-      <div class="card" id="rhythmCard"></div>
-      <div class="section-label" style="margin-top:26px">Backup &amp; sync</div>
-      <div class="card" id="syncCard"></div>
+      <div class="view-toggle" id="setupToggle">
+        <button data-t="subjects" class="on" onclick="setSetupTab('subjects')">Subjects</button>
+        <button data-t="schedule" onclick="setSetupTab('schedule')">Schedule</button>
+        <button data-t="sync" onclick="setSetupTab('sync')">Sync</button>
+        <button data-t="faq" onclick="setSetupTab('faq')">FAQ</button>
+      </div>
+
+      <div id="setup-subjects">
+        <div class="section-label" style="margin-top:6px">Subjects &amp; syllabus</div>
+        <div id="syllabusBody"></div>
+      </div>
+
+      <div id="setup-schedule" style="display:none">
+        <div class="section-label" style="margin-top:6px">Your school week</div>
+        <div class="card" id="schoolCard"></div>
+        <div class="section-label" style="margin-top:26px">Your daily routine</div>
+        <div class="card" id="rhythmCard"></div>
+      </div>
+
+      <div id="setup-sync" style="display:none">
+        <div class="section-label" style="margin-top:6px">Backup &amp; sync</div>
+        <div class="card" id="syncCard"></div>
+      </div>
+
+      <div id="setup-faq" style="display:none">
+        <div class="section-label" style="margin-top:6px">Frequently asked questions</div>
+        <details class="faq-item"><summary>What counts as "Free to study"?</summary>
+          <p>Any gap in your day that isn't school, sleep, or a fixed block (tuition, meals, etc.) and is at least 30 minutes long. Tap one to say what you're studying, split it into pieces, or mark it done.</p></details>
+        <details class="faq-item"><summary>How do I change my school hours or daily routine later?</summary>
+          <p>Setup → Schedule → Edit on either card. Or tap a School/block/sleep segment right on the Day timeline for a today-only change without touching your saved routine.</p></details>
+        <details class="faq-item"><summary>Can I split a free-study block into more than one subject?</summary>
+          <p>Yes — tap the block, then use "Split this time" to break it into pieces, each with its own subject and status. You can merge pieces back together the same way.</p></details>
+        <details class="faq-item"><summary>How do I add a tuition class?</summary>
+          <p>On the Day view, tap "＋ Paste tuition schedule" and paste the message from your tuition centre — it reads the date and times for you to confirm. You can also save it as your usual pattern for that weekday.</p></details>
+        <details class="faq-item"><summary>What do the Not done / Partial / Done marks mean?</summary>
+          <p>A quick, tappable status on every slot (study, school, tuition, even sleep) so you can track what actually happened, not just what was planned.</p></details>
+        <details class="faq-item"><summary>Is my data private?</summary>
+          <p>Everything lives only in this browser's local storage by default — nothing is sent anywhere. Google Drive backup (Setup → Sync) is entirely optional and off unless you turn it on yourself.</p></details>
+        <details class="faq-item"><summary>What does Google Drive backup actually share with the app?</summary>
+          <p>Only a single backup file in a hidden folder Markzo creates for itself — it can't see or touch anything else in your Drive.</p></details>
+        <details class="faq-item"><summary>Do I need to set anything up to use the AI timetable reader?</summary>
+          <p>The built-in photo reader (onboarding Step 1) works with no setup. The separate AI reader in <code>timetable.html</code> is optional and needs your own backend — see the README if you want that instead.</p></details>
+        <details class="faq-item"><summary>I made a mistake during setup — can I start over?</summary>
+          <p>Yes. Setup → Schedule → Edit takes you back into the same screens with your current answers pre-filled, and there's a Cancel option if you change your mind partway.</p></details>
+      </div>
     </div>
   </div>
 </div>
@@ -437,7 +495,7 @@ const STEPS=[
       <div class="eyebrow">ICSE Class 10</div>
       <h1>A plan that fits your real day.</h1>
       <div class="lead">First, your school week — so study only ever lands in the hours you're actually free. Takes a few taps.</div>`,
-    foot:()=>`<button class="btn" onclick="next()">Start</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':''}`
+    foot:()=>`<button class="btn" onclick="next()">Start</button>${editMode?'<button class="btn link" onclick="cancelEdit()">Cancel</button>':'<button class="btn link" onclick="skipSetup()">Skip — use defaults, edit later</button>'}`
   },
   {  // school hours
     render:()=>`
@@ -695,6 +753,10 @@ function acceptReview(){
   toast('School hours set — check the days below');
 }
 
+// jump straight into the app with sensible defaults — draft/rdraft still
+// hold their untouched initial values at this point (only reachable from
+// the very first onboarding step), same values finishSetup() would save
+function skipSetup(){ finishSetup(); }
 function finishSetup(){
   if(hm2m(rdraft.wake.time)>=hm2m(rdraft.sleep.time)){toast('Sleep time should be after wake time');return;}
   // validate blocks
@@ -1140,7 +1202,18 @@ function setPage(p){
   document.getElementById('page-setup').style.display=p==='setup'?'block':'none';
   document.getElementById('appTitle').textContent=p==='home'?'Today':'Setup';
   if(p==='home')renderTimeline();
-  if(p==='setup'){renderSyllabus();renderSchoolCard();renderRhythmCard();renderSyncCard();}
+  if(p==='setup'){renderSyllabus();renderSchoolCard();renderRhythmCard();renderSyncCard();setSetupTab(setupTab);}
+  window.scrollTo(0,0);
+}
+
+/* ---- setup page: sub-tabs ---- */
+let setupTab='subjects';
+function setSetupTab(t){
+  setupTab=t;
+  document.querySelectorAll('#setupToggle button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  ['subjects','schedule','sync','faq'].forEach(name=>{
+    document.getElementById('setup-'+name).style.display=name===t?'block':'none';
+  });
   window.scrollTo(0,0);
 }
 
