@@ -7,6 +7,8 @@
 <!-- vendored so the reader still loads if the school WiFi blocks CDNs; only the
      language/engine data (a few MB, fetched on first use) still comes from jsdelivr -->
 <script defer src="vendor/tesseract.min.js"></script>
+<!-- Google's own sign-in widget — must be loaded from google.com, can't be vendored -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
   :root{
     --paper:#f5f1e8;
@@ -292,6 +294,8 @@
       <div class="card" id="schoolCard"></div>
       <div class="section-label">Your daily routine</div>
       <div class="card" id="rhythmCard"></div>
+      <div class="section-label" style="margin-top:26px">Backup &amp; sync</div>
+      <div class="card" id="syncCard"></div>
     </div>
   </div>
 </div>
@@ -372,7 +376,7 @@ const CORE7=["English Language","Literature in English","Mathematics","Physics",
 
 let S = load();
 function load(){try{return JSON.parse(localStorage.getItem('bt_state'))||null;}catch(e){return null;}}
-function save(){localStorage.setItem('bt_state',JSON.stringify(S));}
+function save(){localStorage.setItem('bt_state',JSON.stringify(S));gdriveScheduleSync();}
 
 function fresh(){
   return {
@@ -1136,7 +1140,7 @@ function setPage(p){
   document.getElementById('page-setup').style.display=p==='setup'?'block':'none';
   document.getElementById('appTitle').textContent=p==='home'?'Today':'Setup';
   if(p==='home')renderTimeline();
-  if(p==='setup'){renderSyllabus();renderSchoolCard();renderRhythmCard();}
+  if(p==='setup'){renderSyllabus();renderSchoolCard();renderRhythmCard();renderSyncCard();}
   window.scrollTo(0,0);
 }
 
@@ -1392,6 +1396,155 @@ function cancelEdit(){
 }
 function editSchool(){ seedDraftsFromState(); openOnbAt(1); }
 function editRhythm(){ seedDraftsFromState(); openOnbAt(2); }
+
+/* ============================================================
+   GOOGLE DRIVE SYNC  — optional, client-only backup/restore.
+   Uses the drive.appdata scope: a hidden per-app folder only
+   this app can see, so nothing shows up in the user's visible
+   Drive. Needs a Google Cloud OAuth Client ID the student
+   supplies themselves (see README) — none is bundled.
+   ============================================================ */
+const GDRIVE_SCOPE='https://www.googleapis.com/auth/drive.appdata';
+const GDRIVE_FILENAME='markzo-backup.json';
+let gdriveToken=null, gdriveTokenClient=null, gdriveSyncTimer=null;
+
+function gdriveClientId(){ return localStorage.getItem('bt_gdrive_client_id')||''; }
+function gdriveFileId(){ return localStorage.getItem('bt_gdrive_file_id')||''; }
+function gdriveLastSync(){ return localStorage.getItem('bt_gdrive_last_sync')||''; }
+function gdriveLastSyncLabel(){
+  const v=gdriveLastSync();
+  return v?'Last synced '+new Date(v).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'numeric',minute:'2-digit'}):'Not backed up yet';
+}
+
+function renderSyncCard(){
+  const el=document.getElementById('syncCard');
+  if(!el) return;
+  const clientId=gdriveClientId();
+  let body;
+  if(!clientId){
+    body=`<div style="padding:16px 18px">
+      <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5">Back up your data to Google Drive so it survives a reset or a new device. Needs a free Google Cloud OAuth Client ID — one-time setup, see the README.</p>
+      <input type="text" id="gdriveClientIdInput" placeholder="Google OAuth Client ID"
+        style="width:100%;padding:12px;border:1px solid var(--line);border-radius:11px;background:var(--paper-2);font-size:14px;margin-bottom:10px">
+      <button class="btn" onclick="saveGdriveClientId()">Save</button>
+    </div>`;
+  }else if(!gdriveToken){
+    body=`<div class="sch-row">
+      <div class="sch-ic"><svg viewBox="0 0 24 24"><path d="M8 3h8l5 8-5 10H8L3 11z"/></svg></div>
+      <div class="sch-info"><h3>Google Drive</h3><p>${esc(gdriveLastSyncLabel())}</p></div>
+      <button class="sch-edit" onclick="gdriveConnect()">Connect</button>
+    </div>
+    <div style="padding:0 18px 16px"><button class="btn link" style="padding:0" onclick="clearGdriveClientId()">Use a different Client ID</button></div>`;
+  }else{
+    body=`<div class="sch-row">
+      <div class="sch-ic"><svg viewBox="0 0 24 24"><path d="M8 3h8l5 8-5 10H8L3 11z"/></svg></div>
+      <div class="sch-info"><h3>Google Drive connected</h3><p>${esc(gdriveLastSyncLabel())}</p></div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 18px 16px">
+      <button class="btn ghost" style="flex:1" onclick="gdriveBackupNow()">Back up now</button>
+      <button class="btn ghost" style="flex:1" onclick="gdriveRestoreNow()">Restore</button>
+    </div>
+    <div style="padding:0 18px 16px"><button class="btn link" style="padding:0;color:#c0392b" onclick="gdriveDisconnect()">Disconnect</button></div>`;
+  }
+  el.innerHTML=body;
+}
+function saveGdriveClientId(){
+  const v=document.getElementById('gdriveClientIdInput').value.trim();
+  if(!v){toast('Paste your Client ID first');return;}
+  localStorage.setItem('bt_gdrive_client_id',v);
+  gdriveTokenClient=null;
+  renderSyncCard();
+}
+function clearGdriveClientId(){
+  gdriveDisconnect();
+  localStorage.removeItem('bt_gdrive_client_id');
+  localStorage.removeItem('bt_gdrive_file_id');
+  gdriveTokenClient=null;
+  renderSyncCard();
+}
+function gdriveConnect(){
+  if(typeof google==='undefined'||!google.accounts){toast('Google sign-in is still loading — try again in a moment');return;}
+  const clientId=gdriveClientId();
+  if(!clientId){toast('Save a Client ID first');return;}
+  if(!gdriveTokenClient){
+    gdriveTokenClient=google.accounts.oauth2.initTokenClient({
+      client_id:clientId,
+      scope:GDRIVE_SCOPE,
+      callback:(resp)=>{
+        if(!resp||resp.error){ toast('Could not connect to Google Drive'); return; }
+        gdriveToken=resp.access_token;
+        renderSyncCard();
+        toast('Google Drive connected');
+        gdriveBackupNow(true);
+      }
+    });
+  }
+  gdriveTokenClient.requestAccessToken({prompt:''});
+}
+function gdriveDisconnect(){
+  if(gdriveToken && typeof google!=='undefined' && google.accounts) google.accounts.oauth2.revoke(gdriveToken,()=>{});
+  gdriveToken=null;
+  renderSyncCard();
+}
+async function gdriveApi(path,opts){
+  const res=await fetch('https://www.googleapis.com'+path,{...opts,headers:{...(opts&&opts.headers),'Authorization':'Bearer '+gdriveToken}});
+  if(!res.ok){ const e=new Error('Drive API error '+res.status); e.status=res.status; throw e; }
+  return res;
+}
+async function gdriveFindFile(){
+  const existing=gdriveFileId();
+  if(existing) return existing;
+  const res=await gdriveApi('/drive/v3/files?spaces=appDataFolder&q='+encodeURIComponent(`name='${GDRIVE_FILENAME}'`)+'&fields=files(id)');
+  const data=await res.json();
+  const id=data.files&&data.files[0]&&data.files[0].id;
+  if(id) localStorage.setItem('bt_gdrive_file_id',id);
+  return id||null;
+}
+async function gdriveBackupNow(silent){
+  if(!gdriveToken){ if(!silent)toast('Connect Google Drive first'); return; }
+  try{
+    const body=JSON.stringify(S);
+    const id=await gdriveFindFile();
+    if(id){
+      await gdriveApi('/upload/drive/v3/files/'+id+'?uploadType=media',{method:'PATCH',headers:{'Content-Type':'application/json'},body});
+    }else{
+      const boundary='markzo'+Date.now();
+      const metadata=JSON.stringify({name:GDRIVE_FILENAME,parents:['appDataFolder']});
+      const multipart=`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${metadata}\r\n`
+        +`--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+      const res=await gdriveApi('/upload/drive/v3/files?uploadType=multipart',{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+boundary},body:multipart});
+      const created=await res.json();
+      localStorage.setItem('bt_gdrive_file_id',created.id);
+    }
+    localStorage.setItem('bt_gdrive_last_sync',new Date().toISOString());
+    if(!silent) toast('Backed up to Google Drive');
+    renderSyncCard();
+  }catch(e){
+    if(!silent) toast('Backup failed — try reconnecting');
+  }
+}
+async function gdriveRestoreNow(){
+  if(!gdriveToken){toast('Connect Google Drive first');return;}
+  if(!confirm('This replaces everything on this device with your Google Drive backup. Continue?')) return;
+  try{
+    const id=await gdriveFindFile();
+    if(!id){toast('No backup found in Drive yet');return;}
+    const res=await gdriveApi('/drive/v3/files/'+id+'?alt=media');
+    S=await res.json();
+    save();
+    localStorage.setItem('bt_gdrive_last_sync',new Date().toISOString());
+    toast('Restored from Google Drive');
+    boot();
+  }catch(e){
+    toast('Restore failed — try reconnecting');
+  }
+}
+// debounced so rapid local edits don't each trigger a Drive upload
+function gdriveScheduleSync(){
+  if(!gdriveToken) return;
+  clearTimeout(gdriveSyncTimer);
+  gdriveSyncTimer=setTimeout(()=>gdriveBackupNow(true),4000);
+}
 
 /* ---- start ---- */
 try{
