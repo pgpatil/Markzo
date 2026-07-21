@@ -8,13 +8,26 @@ Static, no-build site — open `index.html` directly, or serve the folder with a
 - `vendor/` — the Tesseract.js OCR library, committed locally so the timetable reader in `index.html` still works if a school network blocks CDNs. Only the JS engine is vendored (~200KB); the language/training data (a few MB) is still fetched from jsdelivr the first time OCR actually runs.
 - `worker/` — an optional Cloudflare Worker backend for `timetable.html`'s AI reader. Not required for `index.html`'s on-device reader.
 
-## Google Drive backup (optional)
+## Backup (Setup → Sync)
 
-Setup → Backup & sync lets you back up your study data to Google Drive, so a
-reset or a new device doesn't lose it. It's entirely client-side (no backend,
-no server ever sees your data) — the app writes one JSON file to a hidden,
-app-only folder in your Drive (the `drive.appdata` scope: it never sees or
-lists your other files, and nothing shows up in your normal Drive view).
+Two options, from simplest to most automatic:
+
+- **Download/restore a file** — no account, no setup. Tap "Download backup"
+  to save a single JSON file with everything, and "Restore from file" to
+  bring it back on any device. Put the file wherever you like — your own
+  Drive, Dropbox, email — the app doesn't care, since restoring just reads
+  whatever file you hand it back.
+- **Google Drive (automatic)** — for not having to remember to download a
+  file. See below for the one-time setup this needs.
+
+### Google Drive backup (optional)
+
+This lets your study data sync to Google Drive automatically, so a reset or
+a new device doesn't lose it without you having to think about it. It's
+entirely client-side (no backend, no server ever sees your data) — the app
+writes one JSON file to a hidden, app-only folder in your Drive (the
+`drive.appdata` scope: it never sees or lists your other files, and nothing
+shows up in your normal Drive view).
 
 Like `timetable.html`'s backend, none of this is bundled — you set up a free
 Google Cloud OAuth Client ID once and paste it into the app:
