@@ -264,7 +264,12 @@
     body{padding-bottom:0;padding-top:66px;}
     #bottomNav{top:0;bottom:auto;border-top:none;border-bottom:1px solid var(--line);}
     .bn{padding:9px 28px;}
-    .view-toggle{max-width:420px;}
+    /* a day's timeline reads chronologically top-to-bottom — keep it a
+       comfortable single column instead of stretching it edge to edge */
+    #view-day{max-width:600px;margin:0 auto;}
+    /* order-independent lists get the extra width back as two columns */
+    .subj-list,.faq-list{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start;}
+    .subj-list .subj,.faq-list .faq-item{margin-bottom:0;}
   }
 </style>
 </head>
@@ -313,7 +318,7 @@
         <button data-t="subjects" class="on" onclick="setSetupTab('subjects')">Subjects</button>
         <button data-t="schedule" onclick="setSetupTab('schedule')">Schedule</button>
         <button data-t="sync" onclick="setSetupTab('sync')">Sync</button>
-        <button data-t="faq" onclick="setSetupTab('faq')">FAQ</button>
+        <button data-t="help" onclick="setSetupTab('help')">Help</button>
       </div>
 
       <div id="setup-subjects">
@@ -329,30 +334,74 @@
       </div>
 
       <div id="setup-sync" style="display:none">
-        <div class="section-label" style="margin-top:6px">Backup &amp; sync</div>
+        <div class="section-label" style="margin-top:6px">Export &amp; import</div>
+        <div class="card" style="padding:16px 18px">
+          <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 12px;line-height:1.5">The simplest backup — no account, no setup. Download one file with everything, and restore it later on this device or a new one (put the file wherever you like, including your own Drive/Dropbox, by hand).</p>
+          <div style="display:flex;gap:8px">
+            <button class="btn ghost" style="flex:1" onclick="exportBackup()">Download backup</button>
+            <button class="btn ghost" style="flex:1" onclick="document.getElementById('importFile').click()">Restore from file</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json" style="display:none" onchange="importBackup(event)">
+        </div>
+        <div class="section-label" style="margin-top:26px">Google Drive (automatic)</div>
         <div class="card" id="syncCard"></div>
       </div>
 
-      <div id="setup-faq" style="display:none">
-        <div class="section-label" style="margin-top:6px">Frequently asked questions</div>
-        <details class="faq-item"><summary>What counts as "Free to study"?</summary>
-          <p>Any gap in your day that isn't school, sleep, or a fixed block (tuition, meals, etc.) and is at least 30 minutes long. Tap one to say what you're studying, split it into pieces, or mark it done.</p></details>
-        <details class="faq-item"><summary>How do I change my school hours or daily routine later?</summary>
-          <p>Setup → Schedule → Edit on either card. Or tap a School/block/sleep segment right on the Day timeline for a today-only change without touching your saved routine.</p></details>
-        <details class="faq-item"><summary>Can I split a free-study block into more than one subject?</summary>
-          <p>Yes — tap the block, then use "Split this time" to break it into pieces, each with its own subject and status. You can merge pieces back together the same way.</p></details>
-        <details class="faq-item"><summary>How do I add a tuition class?</summary>
-          <p>On the Day view, tap "＋ Paste tuition schedule" and paste the message from your tuition centre — it reads the date and times for you to confirm. You can also save it as your usual pattern for that weekday.</p></details>
-        <details class="faq-item"><summary>What do the Not done / Partial / Done marks mean?</summary>
-          <p>A quick, tappable status on every slot (study, school, tuition, even sleep) so you can track what actually happened, not just what was planned.</p></details>
-        <details class="faq-item"><summary>Is my data private?</summary>
-          <p>Everything lives only in this browser's local storage by default — nothing is sent anywhere. Google Drive backup (Setup → Sync) is entirely optional and off unless you turn it on yourself.</p></details>
-        <details class="faq-item"><summary>What does Google Drive backup actually share with the app?</summary>
-          <p>Only a single backup file in a hidden folder Markzo creates for itself — it can't see or touch anything else in your Drive.</p></details>
-        <details class="faq-item"><summary>Do I need to set anything up to use the AI timetable reader?</summary>
-          <p>The built-in photo reader (onboarding Step 1) works with no setup. The separate AI reader in <code>timetable.html</code> is optional and needs your own backend — see the README if you want that instead.</p></details>
+      <div id="setup-help" style="display:none">
+        <div class="section-label" style="margin-top:6px">Help</div>
+        <p style="font-size:13.5px;color:var(--ink-soft);margin:0 0 18px;line-height:1.55">Markzo turns your school hours, daily routine, and syllabus into a day-by-day study timeline — every gap that isn't school, sleep, or something fixed becomes a "Free to study" slot you can plan and track. Everything below explains how each part works.</p>
+
+        <div class="section-label">Getting started</div>
+        <div class="faq-list">
+        <details class="faq-item"><summary>What happens during onboarding?</summary>
+          <p>Two short steps: your school hours and days (by hand, or upload a timetable photo to read them automatically — see the AI reader question below), then your daily routine (wake/sleep time and any fixed blocks like tuition, meals, or gym). Tap "Skip — use defaults, edit later" on the welcome screen to jump straight in with sensible defaults and fine-tune everything afterwards.</p></details>
         <details class="faq-item"><summary>I made a mistake during setup — can I start over?</summary>
-          <p>Yes. Setup → Schedule → Edit takes you back into the same screens with your current answers pre-filled, and there's a Cancel option if you change your mind partway.</p></details>
+          <p>Yes. Setup → Schedule → Edit on either card takes you back into the same onboarding screens with your current answers pre-filled, with a Cancel option if you change your mind partway.</p></details>
+        </div>
+
+        <div class="section-label" style="margin-top:26px">Your daily timeline (Today)</div>
+        <div class="faq-list">
+        <details class="faq-item"><summary>What counts as "Free to study"?</summary>
+          <p>Any gap in your day that isn't school, sleep, or a fixed block (tuition, meals, etc.) and is at least 30 minutes long. Tap one to say what you're studying, split it into pieces, or mark its status.</p></details>
+        <details class="faq-item"><summary>Can I split a free-study block into more than one subject?</summary>
+          <p>Yes — tap the block, then use "Split this time" to break it into pieces, each with its own subject and status. Merge pieces back together the same way.</p></details>
+        <details class="faq-item"><summary>What do the ✕ / ◐ / ✓ marks on each slot mean?</summary>
+          <p>Not done, Partially done, and Done — a quick tap-to-set status on every slot (study, school, tuition, even sleep) so you can track what actually happened, not just what was planned. Tap the same one again to clear it.</p></details>
+        <details class="faq-item"><summary>Can I change a slot for just today, without editing my whole schedule?</summary>
+          <p>Yes — tap any School, block, tuition, or sleep segment on the Day timeline and use "Change just today" (or "Skip today") for a one-off adjustment that leaves your saved routine untouched. There's also a link from there straight to "Edit the recurring schedule" if you want to change it for good.</p></details>
+        <details class="faq-item"><summary>How do I add a tuition class?</summary>
+          <p>On the Day view, tap "＋ Paste tuition schedule" and paste the message from your tuition centre — it reads the date and times for you to confirm, and can save it as your usual weekly pattern for that weekday.</p></details>
+        <details class="faq-item"><summary>What are the Week and Month views for?</summary>
+          <p>Use the Day/Week/Month toggle at the top of Today. Week shows a 7-day strip of how much of each day is school, fixed commitments, or free study. Month gives a lighter/darker dot per day so you can spot busy stretches at a glance — tap any day in either to jump straight to it.</p></details>
+        </div>
+
+        <div class="section-label" style="margin-top:26px">Subjects &amp; syllabus</div>
+        <div class="faq-list">
+        <details class="faq-item"><summary>How do I pick my subjects and chapters?</summary>
+          <p>Setup → Subjects. Tap the subject chips to turn them on or off (your core ICSE subjects are on by default), then tap a subject's card to trim individual chapters or add ones that aren't listed.</p></details>
+        <details class="faq-item"><summary>What do the +/− weight dots next to each chapter mean?</summary>
+          <p>A rough 1–3 sense of how heavy a chapter is (light/medium/heavy) — tune it with the +/− buttons so your own sense of what needs more time is reflected, ready for when weighted study suggestions build on top of this.</p></details>
+        </div>
+
+        <div class="section-label" style="margin-top:26px">Changing your schedule later</div>
+        <div class="faq-list">
+        <details class="faq-item"><summary>How do I change my school hours or daily routine?</summary>
+          <p>Setup → Schedule → Edit on either the School or Daily routine card. Or tap the pencil icon next to the date on Today to jump straight to Setup.</p></details>
+        <details class="faq-item"><summary>Can I read my timetable from a photo?</summary>
+          <p>Yes — onboarding Step 1 (and its Edit screen) has "Upload a photo of your timetable", read on-device with no account or setup, straight into the start/end time fields for you to confirm. There's also a separate, optional AI reader (see below) for richer results.</p></details>
+        <details class="faq-item"><summary>Do I need to set anything up to use the AI timetable reader?</summary>
+          <p>The built-in photo reader above works with no setup at all. The separate, richer AI reader in <code>timetable.html</code> (reads subjects per period, not just hours) is optional and needs your own backend — see the README if you want that instead.</p></details>
+        </div>
+
+        <div class="section-label" style="margin-top:26px">Backup, sync &amp; privacy</div>
+        <div class="faq-list">
+        <details class="faq-item"><summary>Is my data private?</summary>
+          <p>Everything lives only in this browser's local storage by default — nothing is sent anywhere. Both backup options below (Setup → Sync) are entirely optional and off unless you turn them on yourself.</p></details>
+        <details class="faq-item"><summary>What's the easiest way to back up my data?</summary>
+          <p>Setup → Sync → "Download backup" — no account, no setup, just a file. Keep it somewhere safe (including dragging it into your own Drive/Dropbox yourself) and use "Restore from file" on any device to bring it back.</p></details>
+        <details class="faq-item"><summary>What does Google Drive backup actually share with the app?</summary>
+          <p>Only a single backup file in a hidden folder Markzo creates for itself — it can't see or touch anything else in your Drive. It's the "automatic" option: once connected, changes sync on their own instead of you remembering to download a file.</p></details>
+        </div>
       </div>
     </div>
   </div>
@@ -1211,7 +1260,7 @@ let setupTab='subjects';
 function setSetupTab(t){
   setupTab=t;
   document.querySelectorAll('#setupToggle button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
-  ['subjects','schedule','sync','faq'].forEach(name=>{
+  ['subjects','schedule','sync','help'].forEach(name=>{
     document.getElementById('setup-'+name).style.display=name===t?'block':'none';
   });
   window.scrollTo(0,0);
@@ -1361,7 +1410,7 @@ function renderSyllabus(){
     <div class="section-label" style="margin:6px 2px 10px">Tap the subjects you take</div>
     <div class="subj-chips">${chips}</div>
     <div class="section-label" style="margin:24px 2px 10px">Chapters ${onSubjects.length?'· tap a subject to trim':''}</div>
-    ${lists||'<p style="color:var(--ink-faint);font-size:14px;padding:0 2px">Select subjects above to see their chapters.</p>'}`;
+    <div class="subj-list">${lists||'<p style="color:var(--ink-faint);font-size:14px;padding:0 2px">Select subjects above to see their chapters.</p>'}</div>`;
 }
 function toggleSubjOpen(subj){ if(openSubjects.has(subj))openSubjects.delete(subj);else openSubjects.add(subj); renderSyllabus(); }
 function toggleSubject(subj){ S.subjects[subj].on=!S.subjects[subj].on; save(); renderSyllabus(); }
@@ -1469,6 +1518,33 @@ function cancelEdit(){
 }
 function editSchool(){ seedDraftsFromState(); openOnbAt(1); }
 function editRhythm(){ seedDraftsFromState(); openOnbAt(2); }
+
+/* ============================================================
+   FILE BACKUP  — the simple option: no account, no setup.
+   ============================================================ */
+function exportBackup(){
+  const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='markzo-backup-'+new Date().toISOString().slice(0,10)+'.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  toast('Backup downloaded');
+}
+function importBackup(ev){
+  const f=ev.target.files[0]; ev.target.value=''; if(!f) return;
+  if(!confirm('This replaces everything on this device with the file you pick. Continue?')) return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      S=JSON.parse(reader.result);
+      save();
+      toast('Restored from file');
+      boot();
+    }catch(e){ toast('That file could not be read — is it a Markzo backup?'); }
+  };
+  reader.readAsText(f);
+}
 
 /* ============================================================
    GOOGLE DRIVE SYNC  — optional, client-only backup/restore.
